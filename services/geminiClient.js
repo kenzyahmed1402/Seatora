@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 
 // The models behind the assistant: Gemini, through Google's SDK. A message
-// uses GEMINI_MODEL, or GEMINI_FALLBACK_MODEL when the first is busy.
+// uses GEMINI_MODEL, or GEMINI_FALLBACK_MODEL when the first fails or is
+// cooling down after a rate limit (see agentChat.js).
 export const DEFAULT_MODEL = "gemini-3.5-flash";
 export const DEFAULT_FALLBACK_MODEL = "gemini-3.8-flash";
 
@@ -14,17 +15,19 @@ export const modelNames = () => [
 // it asks for and its text.
 // Gemini 3 models think before answering, by default at length. Choosing
 // tools and answering briefly needs little of it, and it makes each call much
-// faster. timeoutMs is also Google's own deadline for the call.
+// faster. timeoutMs is also Google's own deadline for the call. The SDK
+// doesn't retry by itself; agentChat.js decides what to try next.
 const createGeminiClient = (apiKey) => {
   const ai = new GoogleGenAI({ apiKey });
   return {
-    generate: async ({ model, systemInstruction, contents, functionDeclarations, timeoutMs }) => {
+    generate: async ({ model, systemInstruction, contents, functionDeclarations, timeoutMs, maxOutputTokens }) => {
       const response = await ai.models.generateContent({
         model,
         contents,
         config: {
           systemInstruction,
           tools: [{ functionDeclarations }],
+          ...(maxOutputTokens && { maxOutputTokens }),
           ...(model.startsWith("gemini-3") && { thinkingConfig: { thinkingLevel: "low" } }),
           httpOptions: { timeout: timeoutMs },
         },

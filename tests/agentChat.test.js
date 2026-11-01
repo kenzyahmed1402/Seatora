@@ -4,7 +4,8 @@ import mongoose from "mongoose";
 import { api, book, bookedSeats, createShowtime, createUser, useTestDatabase } from "./helpers.js";
 import { DEFAULT_FALLBACK_MODEL, DEFAULT_MODEL, setModelClient } from "../services/geminiClient.js";
 import { setPayPalClient } from "../services/paypalService.js";
-import { MAX_TOOL_CALLS, TURN_BUDGET_MS, systemInstruction } from "../services/agentChat.js";
+import { MAX_OUTPUT_TOKENS, MAX_TOOL_CALLS, TURN_BUDGET_MS, systemInstruction } from "../services/agentChat.js";
+import { resetCooling } from "../services/modelCooling.js";
 import AgentProposal from "../models/AgentProposal.js";
 import Booking from "../models/Booking.js";
 import Movie from "../models/movies.js";
@@ -58,7 +59,17 @@ beforeEach(() => {
   };
   setPayPalClient(paypal);
 });
-afterEach(() => setModelClient(null));
+afterEach(() => {
+  setModelClient(null);
+  resetCooling();
+});
+
+// A rate limit as Gemini sends it, asking to wait `seconds`
+const rateLimit = (seconds) =>
+  Object.assign(
+    new Error(JSON.stringify({ error: { code: 429, status: "RESOURCE_EXHAUSTED", message: `Please retry in ${seconds}s.`, details: [{ retryDelay: `${seconds}s` }] } })),
+    { status: 429 }
+  );
 
 const setup = async ({ hoursAhead = 48, rows, seatsPerRow } = {}) => {
   const admin = await createUser("ADMIN");
@@ -409,6 +420,103 @@ describe("assistant chat limits", () => {
     assert.equal(res.status, 503);
     assert.match(res.body.message, /seat picker/);
     assert.deepEqual(calls, [DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL]);
+  });
+
+  it("a rate limit partway through a message starts it again on the second model, which the next message uses", async () => {
+    const { alice } = await setup();
+    const calls = [];
+    const requests = [];
+    let firstCalls = 0;
+    let secondCalls = 0;
+    setModelClient({
+      generate: async (request) => {
+        calls.push(request.model);
+        requests.push(structuredClone(request));
+        if (request.model === DEFAULT_MODEL) {
+          firstCalls += 1;
+          if (firstCalls === 1) return ask(["searchMovies", {}]);
+          throw rateLimit(46);
+        }
+        secondCalls += 1;
+        return secondCalls === 1 ? ask(["searchMovies", {}]) : say("Here are the movies.");
+      },
+    });
+
+    const res = await send(alice, "Which movies are on?");
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.reply, "Here are the movies.");
+    assert.deepEqual(calls, [DEFAULT_MODEL, DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL, DEFAULT_FALLBACK_MODEL]);
+    // The second model starts from the customer's message, without the first one's tool calls
+    assert.equal(requests[2].contents.length, 1);
+    assert.equal(requests[2].contents[0].parts[0].text, "Which movies are on?");
+
+    // The first model is still cooling down: the next message goes straight to the second
+    calls.length = 0;
+    secondCalls = 1;
+    assert.equal((await send(alice, "Thanks")).status, 200);
+    assert.deepEqual(calls, [DEFAULT_FALLBACK_MODEL]);
+  });
+
+  it("waits out a short rate limit once on the same model", async () => {
+    const { alice } = await setup();
+    const calls = [];
+    setModelClient({
+      generate: async ({ model }) => {
+        calls.push(model);
+        if (calls.length === 1) throw rateLimit(0.05);
+        return say("Hello!");
+      },
+    });
+    const res = await send(alice, "Hello");
+    assert.equal(res.status, 200);
+    assert.deepEqual(calls, [DEFAULT_MODEL, DEFAULT_MODEL]);
+  });
+
+  it("says how long to wait when every model is rate limited, then tries the one free soonest", async () => {
+    const { alice } = await setup();
+    const calls = [];
+    setModelClient({
+      generate: async ({ model }) => {
+        calls.push(model);
+        throw rateLimit(model === DEFAULT_MODEL ? 46 : 18);
+      },
+    });
+    const res = await send(alice, "Hello");
+    assert.equal(res.status, 503);
+    assert.match(res.body.message, /busy right now\. Please try again in about 20 seconds, or book with the seat picker/);
+    assert.deepEqual(calls, [DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL]);
+    assert.deepEqual((await api.get("/agent/chat").set(alice.auth)).body.data.messages, []);
+
+    calls.length = 0;
+    assert.equal((await send(alice, "Hello?")).status, 503);
+    assert.deepEqual(calls, [DEFAULT_FALLBACK_MODEL]);
+  });
+
+  it("drops the cards of an attempt that failed", async () => {
+    const { alice, showtime } = await setup();
+    let calls = 0;
+    setModelClient({
+      generate: async ({ model }) => {
+        calls += 1;
+        if (model === DEFAULT_MODEL) {
+          if (calls === 1) return ask(["proposeBooking", { showtime: String(showtime._id), seats: ["A1"] }]);
+          throw Object.assign(new Error("overloaded"), { status: 503 });
+        }
+        return say("Which seats would you like?");
+      },
+    });
+    const res = await send(alice, "Book A1");
+    assert.equal(res.status, 200);
+    // The first attempt made a proposal, but its card isn't shown
+    assert.equal(await AgentProposal.countDocuments(), 1);
+    assert.deepEqual(res.body.data.cards, []);
+  });
+
+  it("limits how long an answer can be", async () => {
+    const { alice } = await setup();
+    scriptedModel(say("Hi!"));
+    await send(alice, "Hello");
+    assert.equal(model.requests[0].maxOutputTokens, MAX_OUTPUT_TOKENS);
   });
 
   it("needs a non-empty message of at most 1000 characters", async () => {

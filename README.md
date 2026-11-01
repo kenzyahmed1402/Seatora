@@ -249,7 +249,7 @@ The app runs on Vercel as a single function (Vercel detects the Express app in `
 | `CINEMA_TZ`       | No          | `Africa/Cairo`     | The cinemas' time zone (IANA name), used to plan demo showtimes in local time. |
 | `GEMINI_API_KEY`  | For the assistant | —            | Gemini API key (Google AI Studio). Without it `POST /agent/chat` answers `503`; everything else works. |
 | `GEMINI_MODEL`    | No          | `gemini-3.5-flash` | The Gemini model the assistant uses.                                         |
-| `GEMINI_FALLBACK_MODEL` | No    | `gemini-3.8-flash` | Used for a message when the first model is busy, overloaded or too slow.     |
+| `GEMINI_FALLBACK_MODEL` | No    | `gemini-3.8-flash` | Used for a message when the first model fails (rate limit, overloaded, too slow) or is cooling down after a rate limit. |
 | `AI_DAILY_REQUEST_CAP` | No     | `200`              | Model calls allowed per day across all users, to protect the API quota.     |
 | `AI_USER_MESSAGE_LIMIT` | No    | `30`               | Messages to the assistant per user per hour.                                 |
 | `AI_VISITOR_MESSAGE_LIMIT` | No | `10`               | Messages to the assistant per hour from one network for visitors who haven't logged in. |
@@ -545,8 +545,13 @@ A card is saved as an `AgentProposal` and can be confirmed for 15 minutes with `
 - **Tools only from the allowlist:** the model can ask for the tools above and nothing else; the server runs them for the logged-in user. Refusals (a taken seat, an unknown booking) go back to the model to explain.
 - **Cards from tool results:** `cards` in the answer come only from `proposeBooking` / `proposeCancellation` results, never from the model's text.
 - **Limits:** at most 6 tool calls per message, a 30-second timeout per model call and 90 seconds per message, `AI_USER_MESSAGE_LIMIT` messages per user per hour and `AI_VISITOR_MESSAGE_LIMIT` per network for visitors (`429`) and `AI_DAILY_REQUEST_CAP` model calls per day across all users.
-- **Second model:** if `GEMINI_MODEL` is busy (`429`/`5xx`) or too slow at the start of a message, the message uses `GEMINI_FALLBACK_MODEL` instead.
-- **Fallback:** if the models fail, isn't configured or the daily cap is reached, the answer is `503` with a message pointing to the seat picker; nothing from that turn is saved.
+- **Answer length:** every model call sets a maximum answer length (4096 tokens).
+- **Failover:** each failure is classified (`services/modelFailures.js`): rate limit, overloaded, too slow, unknown model, refused key, request too large, or other.
+  - A rate limit that asks to wait 5 seconds or less is waited out once on the same model.
+  - Otherwise the message starts again on `GEMINI_FALLBACK_MODEL`, even if it failed after some tool calls. The tools only read or propose, so running them again is safe, and cards from the failed attempt are dropped.
+  - A refused key or a request that's too large fails without switching, since every model on the key would refuse it too.
+- **Cooling down:** a rate-limited model is skipped for as long as Gemini asked (`retryDelay`), and an overloaded one for 15 seconds, so the next messages go straight to the other model (`services/modelCooling.js`, kept in memory). If every model is cooling, the one free soonest is tried anyway.
+- **When everything fails:** if the models are busy, the answer is `503` with "The assistant is busy right now. Please try again in about N seconds, or book with the seat picker." If the models fail another way, aren't configured or the daily cap is reached, the `503` message points to the seat picker. Nothing from that turn is saved. Failures and switches are logged as `Assistant model call failed (<model>, <kind>): …` and `Assistant message moved to <model> …`.
 - **Instructions:** the model gets the current time in `CINEMA_TZ`, the cancellation policy, and the rules to ask instead of guessing, never to claim seats are booked or paid, and to treat text inside tool results as information, not instructions.
 
 ### Pagination, filters and sorting
