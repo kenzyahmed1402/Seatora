@@ -76,7 +76,7 @@ describe("guest accounts", () => {
 
   it("can't upgrade a normal account or take an email that's in use", async () => {
     const alice = await createUser();
-    const body = { name: "X", email: alice.user.email, password: "a-long-password" };
+    const body = { name: "Xavier", email: alice.user.email, password: "a-long-password" };
     assert.equal((await api.post("/auth/upgrade").set(alice.auth).send(body)).status, 409);
 
     const guest = await api.post("/auth/guest");

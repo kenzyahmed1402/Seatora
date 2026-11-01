@@ -147,7 +147,7 @@ const SaveBooking = () => {
       <form className="stack" onSubmit={submit}>
         <label>
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} autoComplete="name" />
+          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={50} autoComplete="name" />
         </label>
         <label>
           Email

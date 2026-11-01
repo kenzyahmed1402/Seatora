@@ -37,6 +37,9 @@ const handleValidationErrorDB = (err) => {
 
 const handleDuplicateFieldDB = (err) => {
   const fields = Object.keys(err.keyValue ?? {});
+  if (fields.length === 1 && fields[0] === 'email') {
+    return new AppError('An account with this email already exists. Please log in instead.', 409);
+  }
   const values = Object.values(err.keyValue ?? {}).map((value) =>
     value instanceof Date ? value.toISOString() : value
   );

@@ -254,6 +254,7 @@ The app runs on Vercel as a single function (Vercel detects the Express app in `
 | `AI_USER_MESSAGE_LIMIT` | No    | `30`               | Messages to the assistant per user per hour.                                 |
 | `AI_VISITOR_MESSAGE_LIMIT` | No | `10`               | Messages to the assistant per hour from one network for visitors who haven't logged in. |
 | `GUEST_ACCOUNT_LIMIT` | No      | `10`               | Guest accounts that one network can create per hour.                         |
+| `SIGNUP_RATE_LIMIT` | No        | `10`               | New accounts (register, or a guest saving their account) that one network can create per hour. |
 | `ADMIN_NAME`      | No          | `Admin User`       | Used by `scripts/seedAdmin.js`.                                             |
 | `ADMIN_EMAIL`     | No          | `admin@cinema.com` | Used by `scripts/seedAdmin.js`.                                             |
 | `ADMIN_PASSWORD`  | For seeding | —                  | Used by `scripts/seedAdmin.js`; at least 12 characters, or the script refuses to run. |
@@ -303,6 +304,14 @@ All documents have `createdAt` / `updatedAt` timestamps.
 | `email`    | String | required, unique, valid email, max 254 chars, stored lowercase |
 | `password` | String | required, 8 chars to 72 bytes, hashed, never returned  |
 | `role`     | String | `CUSTOMER` (default) or `ADMIN`                        |
+
+Signing up (`POST /auth/register`, `POST /auth/upgrade`) adds these rules, in `utils/accountRules.js`:
+
+- **Name:** 2–50 characters after extra spaces are removed; letters of any one alphabet (with accents), with a space, hyphen, apostrophe or full stop between words; no digits or symbols. Names that pass for the cinema or its staff are refused, such as `Admin`, `Seatora Support` or `Guest`, including look-alike spellings (`A d-m í n`, Cyrillic `Аdmin`, fullwidth `ａｄｍｉｎ`).
+- **Email:** not a `.invalid` address (guest accounts use `@guest.invalid`).
+- **Password:** not a common password, not the email or name, and at least 4 different characters.
+
+Login only checks the shape of the email and password, so older accounts can still log in.
 
 ### Cinema
 
@@ -741,9 +750,9 @@ Common status codes:
 | ----------------- | ------------------------------------------------------------------------------------------ | ----------------- |
 | helmet            | Standard security headers; hides `X-Powered-By`                                            | —                 |
 | CORS              | Lets browser frontends call the API; any origin unless restricted                          | `CORS_ORIGIN`     |
-| Rate limiting     | 300 requests per IP per 15 minutes across the API, and 10 failed login/register attempts per IP per 15 minutes (successes don't count); then `429`. Counts are kept in MongoDB, shared by every running instance, with IPs stored only as hashes and deleted after the window | `API_RATE_LIMIT`, `AUTH_RATE_LIMIT` |
+| Rate limiting     | 300 requests per IP per 15 minutes across the API, 10 failed login/register attempts per IP per 15 minutes (successes don't count), and 10 new accounts per IP per hour; then `429`. Counts are kept in MongoDB, shared by every running instance, with IPs stored only as hashes and deleted after the window | `API_RATE_LIMIT`, `AUTH_RATE_LIMIT`, `SIGNUP_RATE_LIMIT` |
 | Proxy awareness   | Real client IPs for rate limiting when hosted behind a proxy                               | `TRUST_PROXY`     |
-| Password hashing  | bcrypt; passwords are never returned                                                       | —                 |
+| Password hashing  | bcrypt; passwords are never returned. A login for an unknown email takes as long as a wrong password, so it doesn't reveal which emails have accounts | —                 |
 
 ## Testing
 

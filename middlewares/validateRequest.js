@@ -5,7 +5,7 @@ const isValidEmail = (email) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
-const validateField = (field, value, rules, partial) => {
+const validateField = (field, value, rules, partial, values) => {
   const errors = [];
 
   // In partial mode (updates) a missing required field is fine, but it
@@ -89,6 +89,13 @@ const validateField = (field, value, rules, partial) => {
     errors.push(`${field} must not contain duplicates`);
   }
 
+  // A field's own rule, e.g. reserved names: (value, all checked fields) →
+  // a message, or null. Only for values that passed the checks above.
+  if (rules.check && errors.length === 0) {
+    const problem = rules.check(value, values);
+    if (problem) errors.push(problem);
+  }
+
   return errors;
 };
 
@@ -98,15 +105,23 @@ const validateField = (field, value, rules, partial) => {
 // updates - only the fields that were sent are checked. Also used for the
 // assistant's tool arguments.
 export const checkFields = (schema, data, { partial = false } = {}) => {
-  const body = data ?? {};
+  const body = { ...(data ?? {}) };
   const errors = [];
+
+  // `normalize` tidies a text field before it's checked, and the tidy value
+  // is the one kept, e.g. a name without extra spaces
+  for (const [field, rules] of Object.entries(schema)) {
+    if (rules.normalize && typeof body[field] === "string") {
+      body[field] = rules.normalize(body[field]);
+    }
+  }
 
   if (partial && !Object.keys(schema).some((field) => body[field] !== undefined)) {
     throw new AppError("Provide at least one field to update", 400);
   }
 
   for (const [field, rules] of Object.entries(schema)) {
-    errors.push(...validateField(field, body[field], rules, partial));
+    errors.push(...validateField(field, body[field], rules, partial, body));
   }
 
   if (errors.length > 0) {

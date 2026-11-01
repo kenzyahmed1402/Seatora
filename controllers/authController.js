@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import AppError from '../utils/AppError.js';
 import catchAsync from '../utils/catchAsync.js';
@@ -25,6 +27,17 @@ export const register = catchAsync(async (req, res) => {
   await logIn(req, res, user, 201);
 });
 
+// A hash of a random password, made on first use with the same cost as real
+// ones. A login for an email without an account is checked against it, so
+// the answer takes as long as a wrong password and doesn't reveal which
+// emails have accounts.
+let unusedHash;
+const checkAgainstUnusedHash = async (password) => {
+  unusedHash ??= bcrypt.hash(randomBytes(32).toString('hex'), 12);
+  await bcrypt.compare(password, await unusedHash);
+  return false;
+};
+
 export const login = catchAsync(async (req, res) => {
   const { email, password } = req.body;
 
@@ -33,8 +46,9 @@ export const login = catchAsync(async (req, res) => {
   }
 
   const user = await User.findOne({ email }).select('+password');
+  const matches = user ? await user.comparePassword(password) : await checkAgainstUnusedHash(password);
 
-  if (!user || !(await user.comparePassword(password))) {
+  if (!matches) {
     throw new AppError('Incorrect email or password', 401);
   }
 

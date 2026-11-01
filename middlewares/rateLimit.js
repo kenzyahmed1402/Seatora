@@ -34,6 +34,21 @@ export const authLimiter = rateLimit({
     next(new AppError("Too many failed attempts. Please try again in 15 minutes.", 429)),
 });
 
+// Limits new accounts per IP (register, and guests saving their account), so
+// a script can't create thousands. Failed attempts are counted by
+// authLimiter instead.
+export const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: Number(process.env.SIGNUP_RATE_LIMIT) || 10,
+  skipFailedRequests: true,
+  store: new MongoRateLimitStore("signup:"),
+  passOnStoreError: true,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: (req, res, next) =>
+    next(new AppError("Too many new accounts from this network. Please try again in an hour.", 429)),
+});
+
 // Limits new guest accounts per IP, so a script can't create thousands
 export const guestLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
