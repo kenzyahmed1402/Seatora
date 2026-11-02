@@ -47,10 +47,20 @@ describe("assistant replies", () => {
     assert.deepEqual(compact.slice(0, 2), history.slice(0, 2));
   });
 
+  it("gives the model the coming days with their weekdays and search windows", () => {
+    // Monday 2 November 2026, 20:00 in Cairo (UTC+2)
+    const rules = systemInstruction(new Date("2026-11-02T18:00:00Z"));
+    assert.match(rules, /Today, Monday 2 November: from 2026-11-01T22:00:00.000Z to 2026-11-02T22:00:00.000Z/);
+    assert.match(rules, /Saturday 7 November: from 2026-11-06T22:00:00.000Z to 2026-11-07T22:00:00.000Z/);
+    assert.match(rules, /Sunday 8 November/);
+    assert.doesNotMatch(rules, /Monday 9 November/);
+  });
+
   it("tells the model how to format replies and never to draw cards", () => {
     const rules = systemInstruction(new Date());
     assert.match(rules, /never tables/);
-    assert.match(rules, /don't list them yourself/);
+    assert.match(rules, /never say you can't show them, and don't write them out yourself/);
+    assert.match(rules, /search right away with what you know/);
     assert.match(rules, /Never write a card, a button/);
     assert.match(rules, /getAvailableSeats/);
     assert.match(rules, /call searchShowtimes in that turn, even if you searched before/);
