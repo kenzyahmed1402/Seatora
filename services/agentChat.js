@@ -245,7 +245,7 @@ const runMessage = async (entry, owner, history, message, started) => {
     if (calls.length === 0) {
       const reply = response.text?.trim() || "Sorry, I don't have an answer for that.";
       const searched = tools.includes("searchShowtimes") || tools.includes("searchMovies");
-      if (reminder < 0 && !searched && claimsShowtimes(reply)) {
+      if (reminder < 0 && !searched && cards.length === 0 && claimsShowtimes(reply)) {
         console.error("Assistant reply claimed showtimes without searching; asked to search");
         reminder = contents.length;
         contents.push({ role: "model", parts: [{ text: reply }], by }, { role: "user", parts: [{ text: SEARCH_REMINDER }] });

@@ -431,6 +431,7 @@ describe("assistant chat limits", () => {
     const requests = [];
     let firstCalls = 0;
     let secondCalls = 0;
+    let reply = "Here are the movies.";
     setModelClient({
       generate: async (request) => {
         calls.push(request.model);
@@ -441,7 +442,7 @@ describe("assistant chat limits", () => {
           throw rateLimit(46);
         }
         secondCalls += 1;
-        return secondCalls === 1 ? ask(["searchMovies", {}]) : say("Here are the movies.");
+        return secondCalls === 1 ? ask(["searchMovies", {}]) : say(reply);
       },
     });
 
@@ -456,6 +457,7 @@ describe("assistant chat limits", () => {
     // The first model is still cooling down: the next message goes straight to the second
     calls.length = 0;
     secondCalls = 1;
+    reply = "You're welcome!";
     assert.equal((await send(alice, "Thanks")).status, 200);
     assert.deepEqual(calls, [DEFAULT_FALLBACK_MODEL]);
   });
