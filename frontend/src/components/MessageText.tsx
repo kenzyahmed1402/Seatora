@@ -1,14 +1,17 @@
 import type { ReactNode } from "react";
 
 // The assistant writes plain text with a little Markdown: paragraphs,
-// "- " or "1. " lists and **bold**. A table, which it's asked not to write,
+// "- " or "1. " lists, **bold** and *italic*. A table, which it's asked not to write,
 // is shown as a list, one row per line. It is turned into React elements,
 // never into raw HTML, so a reply can't inject markup into the page.
 
+// **bold** and *italic*
 const inline = (text: string): ReactNode[] =>
-  text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong> : part
-  );
+  text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g).map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("*") && part.endsWith("*") && part.length > 2) return <em key={i}>{part.slice(1, -1)}</em>;
+    return part;
+  });
 
 const BULLET = /^\s*[-*•]\s+/;
 const NUMBERED = /^\s*\d+[.)]\s+/;

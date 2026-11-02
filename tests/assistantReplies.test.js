@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { drawsCard, systemInstruction } from "../services/agentChat.js";
+import { compactHistory, drawsCard, systemInstruction } from "../services/agentChat.js";
 
 describe("assistant replies", () => {
   it("spots a reply that draws its own card or button", () => {
@@ -23,11 +23,36 @@ describe("assistant replies", () => {
     }
   });
 
+  it("shortens earlier search results, so the model searches again instead of listing from memory", () => {
+    const history = [
+      { role: "user", parts: [{ text: "What's on?" }] },
+      { role: "model", parts: [{ functionCall: { name: "searchShowtimes", args: {} } }, { functionCall: { name: "getMyBookings", args: {} } }] },
+      {
+        role: "user",
+        parts: [
+          { functionResponse: { name: "searchShowtimes", response: { output: [{ showtime: "s1" }, { showtime: "s2" }] } } },
+          { functionResponse: { name: "getMyBookings", response: { output: [{ booking: "b1" }] } } },
+        ],
+      },
+      { role: "user", parts: [{ functionResponse: { name: "searchShowtimes", response: { error: "Invalid date" } } }] },
+    ];
+    const compact = compactHistory(history);
+    assert.deepEqual(compact[2].parts[0].functionResponse, {
+      name: "searchShowtimes",
+      response: { output: { showtimesShownToCustomer: 2, note: "Shown to the customer earlier. Search again to see or use them." } },
+    });
+    // Other tools' results and refusals stay as they were
+    assert.deepEqual(compact[2].parts[1], history[2].parts[1]);
+    assert.deepEqual(compact[3], history[3]);
+    assert.deepEqual(compact.slice(0, 2), history.slice(0, 2));
+  });
+
   it("tells the model how to format replies and never to draw cards", () => {
     const rules = systemInstruction(new Date());
     assert.match(rules, /never tables/);
     assert.match(rules, /don't list them yourself/);
     assert.match(rules, /Never write a card, a button/);
     assert.match(rules, /getAvailableSeats/);
+    assert.match(rules, /call searchShowtimes in that turn, even if you searched before/);
   });
 });

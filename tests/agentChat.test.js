@@ -578,6 +578,15 @@ describe("assistant chat limits", () => {
     assert.equal(history.at(-1).showtimes.length, 1);
   });
 
+  it("doesn't give the model an earlier message's search results", async () => {
+    const { alice } = await setup();
+    scriptedModel(ask(["searchShowtimes", {}]), say("I found 1 showtime."), say("Which day suits you?"));
+    await send(alice, "What's on?");
+    await send(alice, "What's on again?");
+    const earlier = model.requests[2].contents.find((turn) => turn.parts.some((part) => part.functionResponse));
+    assert.equal(earlier.parts[0].functionResponse.response.output.showtimesShownToCustomer, 1);
+  });
+
   it("leaves the showtime list out once the message made a card", async () => {
     const { alice, showtime } = await setup();
     scriptedModel(
