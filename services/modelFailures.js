@@ -19,7 +19,7 @@ const has = (err, pattern) => pattern.test(String(err?.message ?? ""));
 export const classifyFailure = (err) => {
   const status = Number(err?.status) || undefined;
   if (status === 404 || has(err, /\bNOT_FOUND\b|model .*not found|is not supported for generateContent/i)) return "missing";
-  if (status === 413 || has(err, /too large|too long|context (length|window)|exceeds the (maximum|limit)|input token count/i)) {
+  if (status === 413 || has(err, /too large|too long|context[ _](length|window)|exceeds the (maximum|limit)|input token count/i)) {
     return "size";
   }
   if (status === 401 || status === 403 || has(err, /API key not valid|API_KEY_INVALID|PERMISSION_DENIED|UNAUTHENTICATED|invalid api key/i)) {
@@ -43,12 +43,13 @@ export const isAccountWide = (err) =>
   has(err, /credits? (are |is )?(depleted|exhausted)|out of credits?|insufficient (credit|balance|funds)|payment required|billing (is )?(not enabled|disabled)/i);
 
 // How long the provider asked us to wait, in ms, if it said: Gemini puts
-// "retryDelay": "46s" in its error and "retry in 46.8s" in the message.
+// "retryDelay": "46s" in its error and "retry in 46.8s" in the message;
+// Groq says "try again in 7.5s".
 // A transport can also set err.retryAfterMs from a Retry-After header.
 export const retryAfterMs = (err) => {
   if (Number.isFinite(err?.retryAfterMs)) return err.retryAfterMs;
   const message = String(err?.message ?? "");
-  const match = message.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/) ?? message.match(/retry in (\d+(?:\.\d+)?)\s*s/i);
+  const match = message.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/) ?? message.match(/(?:retry|try again) in (\d+(?:\.\d+)?)\s*s/i);
   return match ? Math.ceil(Number(match[1]) * 1000) : undefined;
 };
 

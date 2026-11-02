@@ -6,6 +6,8 @@ import { DEFAULT_FALLBACK_MODEL, DEFAULT_MODEL, setModelClient } from "../servic
 import { setPayPalClient } from "../services/paypalService.js";
 import { MAX_OUTPUT_TOKENS, MAX_TOOL_CALLS, TURN_BUDGET_MS, systemInstruction } from "../services/agentChat.js";
 import { resetCooling } from "../services/modelCooling.js";
+import { DEFAULT_GROQ_MODELS, setGroqClient } from "../services/groqClient.js";
+import AgentConversation from "../models/AgentConversation.js";
 import AgentProposal from "../models/AgentProposal.js";
 import Booking from "../models/Booking.js";
 import Movie from "../models/movies.js";
@@ -61,6 +63,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   setModelClient(null);
+  setGroqClient(null);
   resetCooling();
 });
 
@@ -510,6 +513,56 @@ describe("assistant chat limits", () => {
     // The first attempt made a proposal, but its card isn't shown
     assert.equal(await AgentProposal.countDocuments(), 1);
     assert.deepEqual(res.body.data.cards, []);
+  });
+
+  it("hands the message to Groq when both Gemini models are rate limited, and marks who wrote each turn", async () => {
+    const { alice } = await setup();
+    const calls = [];
+    setModelClient({
+      generate: async ({ model }) => {
+        calls.push(model);
+        throw rateLimit(46);
+      },
+    });
+    let groqCalls = 0;
+    setGroqClient({
+      generate: async ({ model }) => {
+        calls.push(model);
+        groqCalls += 1;
+        return groqCalls === 1 ? ask(["searchMovies", {}]) : say("Here are the movies.");
+      },
+    });
+
+    const res = await send(alice, "Which movies are on?");
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.reply, "Here are the movies.");
+    assert.deepEqual(calls, [DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL, DEFAULT_GROQ_MODELS[0], DEFAULT_GROQ_MODELS[0]]);
+
+    const stored = JSON.parse((await AgentConversation.findOne({ user: alice.user._id })).contents);
+    assert.deepEqual(
+      stored.filter((turn) => turn.role === "model").map((turn) => turn.by),
+      ["groq", "groq"]
+    );
+  });
+
+  it("a refused Groq key skips Groq's other model", async () => {
+    const { alice } = await setup();
+    const calls = [];
+    setModelClient({
+      generate: async ({ model }) => {
+        calls.push(model);
+        throw Object.assign(new Error("overloaded"), { status: 503 });
+      },
+    });
+    setGroqClient({
+      generate: async ({ model }) => {
+        calls.push(model);
+        throw Object.assign(new Error("Invalid API Key"), { status: 401 });
+      },
+    });
+    const res = await send(alice, "Hello");
+    assert.equal(res.status, 503);
+    assert.deepEqual(calls, [DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL, DEFAULT_GROQ_MODELS[0]]);
   });
 
   it("limits how long an answer can be", async () => {
