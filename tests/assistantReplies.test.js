@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { compactHistory, drawsCard, systemInstruction } from "../services/agentChat.js";
+import { claimsShowtimes, compactHistory, drawsCard, systemInstruction } from "../services/agentChat.js";
 
 describe("assistant replies", () => {
   it("spots a reply that draws its own card or button", () => {
@@ -20,6 +20,19 @@ describe("assistant replies", () => {
       "You can cancel up to 2 hours before the show.",
     ]) {
       assert.equal(drawsCard(reply), false, reply);
+    }
+  });
+
+  it("spots a reply that says it shows showtimes", () => {
+    for (const reply of [
+      "Here are the showtimes at Seatora Downtown for this weekend.",
+      "Here are the 18 showtimes this Saturday.",
+      "I found 4 comedy shows on Saturday.",
+    ]) {
+      assert.equal(claimsShowtimes(reply), true, reply);
+    }
+    for (const reply of ["Which movie or time would you like?", "How many seats would you like?", "There are no showtimes matching that."]) {
+      assert.equal(claimsShowtimes(reply), false, reply);
     }
   });
 

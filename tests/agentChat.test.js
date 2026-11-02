@@ -587,6 +587,37 @@ describe("assistant chat limits", () => {
     assert.equal(earlier.parts[0].functionResponse.response.output.showtimesShownToCustomer, 1);
   });
 
+  it("asks the model to search when its reply claims showtimes it didn't search for, and stores only the result", async () => {
+    const { alice } = await setup();
+    scriptedModel(
+      say("Here are the showtimes at Downtown this weekend."),
+      (request) => {
+        assert.match(request.contents.at(-1).parts[0].text, /you didn't call searchShowtimes/);
+        return ask(["searchShowtimes", {}]);
+      },
+      say("Here is 1 showtime at Downtown this weekend.")
+    );
+    const res = await send(alice, "Downtown this weekend");
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.reply, "Here is 1 showtime at Downtown this weekend.");
+    assert.equal(res.body.data.showtimes.length, 1);
+
+    const stored = (await AgentConversation.findOne({ user: alice.user._id })).contents;
+    assert.doesNotMatch(stored, /Note from the app/);
+    assert.doesNotMatch(stored, /Here are the showtimes at Downtown/);
+  });
+
+  it("asks only once, and not when the reply claims nothing", async () => {
+    const { alice } = await setup();
+    scriptedModel(say("Here are the showtimes."), say("Here are the showtimes."));
+    assert.equal((await send(alice, "What's on?")).body.data.reply, "Here are the showtimes.");
+    assert.equal(model.requests.length, 2);
+
+    scriptedModel(say("Which day suits you?"));
+    await send(alice, "Hi");
+    assert.equal(model.requests.length, 1);
+  });
+
   it("leaves the showtime list out once the message made a card", async () => {
     const { alice, showtime } = await setup();
     scriptedModel(
