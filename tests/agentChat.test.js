@@ -565,6 +565,17 @@ describe("assistant chat limits", () => {
     assert.deepEqual(calls, [DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL, DEFAULT_GROQ_MODELS[0]]);
   });
 
+  it("replaces a reply that draws a card when no card was made", async () => {
+    const { alice } = await setup();
+    scriptedModel(say("Here’s a booking card for 2 seats (A1, A2).\n\n[Confirm Booking] (click to proceed to PayPal)"));
+    const res = await send(alice, "2");
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.data.cards, []);
+    assert.match(res.body.data.reply, /couldn't prepare the booking card/);
+    const stored = JSON.parse((await AgentConversation.findOne({ user: alice.user._id })).contents);
+    assert.match(stored.at(-1).parts[0].text, /couldn't prepare the booking card/);
+  });
+
   it("limits how long an answer can be", async () => {
     const { alice } = await setup();
     scriptedModel(say("Hi!"));

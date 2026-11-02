@@ -68,12 +68,17 @@ describe("groq client", () => {
     assert.equal(messages[8].content, "No comedies today.");
   });
 
-  it("gives Gemini only its own tool calls, keeps other providers' replies, and drops the provider mark", () => {
+  it("gives Gemini only its own tool calls, turns other providers' lookups into a note on their reply, and drops the provider mark", () => {
     const contents = toGeminiContents(stored);
     assert.equal(contents.length, 6);
     assert.ok(contents.every((turn) => !("by" in turn)));
     assert.equal(contents[1].parts[0].thoughtSignature, "sig");
-    assert.deepEqual(contents.slice(4).map((turn) => turn.parts[0].text), ["Any comedy?", "No comedies today."]);
+    assert.equal(contents[4].parts[0].text, "Any comedy?");
+    const groqReply = contents[5];
+    assert.equal(groqReply.role, "model");
+    assert.ok(groqReply.parts.every((part) => !part.functionCall));
+    assert.equal(groqReply.parts[0].text, '(Looked up with searchShowtimes: {"output":[]})');
+    assert.equal(groqReply.parts[1].text, "No comedies today.");
   });
 
   it("reads Groq's answer as a Gemini turn", () => {

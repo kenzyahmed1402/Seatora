@@ -13,20 +13,41 @@ export const modelNames = () => [
 // The stored conversation as Gemini takes it. Each stored model turn says
 // which provider wrote it (`by`, see agentChat.js). Gemini 3 signs its own
 // tool calls and may refuse unsigned ones, so tool calls written by another
-// provider, and their results, are left out; that provider's replies are
-// kept as text. `by` itself is removed: Gemini refuses unknown fields.
+// provider aren't sent as tool calls: what they looked up is added as a note
+// to that provider's next reply, so Gemini still has the IDs and facts
+// (e.g. a showtime's ID for proposeBooking). `by` itself is removed: Gemini
+// refuses unknown fields.
+const MAX_NOTE_CHARS = 6000;
+
+const lookupNote = (calls, results) =>
+  calls
+    .map((call, i) => {
+      const result = JSON.stringify(results[i]?.response ?? {});
+      return `(Looked up with ${call.name}: ${result.length > MAX_NOTE_CHARS ? `${result.slice(0, MAX_NOTE_CHARS)}…` : result})`;
+    })
+    .join("\n");
+
 export const toGeminiContents = (contents) => {
   const out = [];
+  let notes = [];
   for (let i = 0; i < contents.length; i += 1) {
     const { by, ...turn } = contents[i];
-    const foreignCalls = turn.role === "model" && by && by !== "gemini" && turn.parts?.some((part) => part.functionCall);
-    if (foreignCalls) {
-      // Skip the results that answer these calls too
-      if (contents[i + 1]?.parts?.some((part) => part.functionResponse)) i += 1;
+    const calls = (turn.parts ?? []).filter((part) => part.functionCall).map((part) => part.functionCall);
+    if (turn.role === "model" && by && by !== "gemini" && calls.length > 0) {
+      const next = contents[i + 1];
+      const results = (next?.parts ?? []).filter((part) => part.functionResponse).map((part) => part.functionResponse);
+      if (results.length > 0) i += 1;
+      notes.push(lookupNote(calls, results));
+      continue;
+    }
+    if (turn.role === "model" && notes.length > 0) {
+      out.push({ ...turn, parts: [{ text: notes.join("\n") }, ...(turn.parts ?? [])] });
+      notes = [];
       continue;
     }
     out.push(turn);
   }
+  if (notes.length > 0) out.push({ role: "model", parts: [{ text: notes.join("\n") }] });
   return out;
 };
 

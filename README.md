@@ -548,7 +548,8 @@ A card is saved as an `AgentProposal` and can be confirmed for 15 minutes with `
 
 - **Server-side conversation:** the browser only sends the new message. The conversation, including tool calls and results, is stored per user, or per visitor cookie before login (`AgentConversation`, deleted 24 hours after the last message), so it can't be forged. Visitors can search and get booking cards; the tools about bookings and payments tell them to log in first.
 - **Tools only from the allowlist:** the model can ask for the tools above and nothing else; the server runs them for the logged-in user. Refusals (a taken seat, an unknown booking) go back to the model to explain.
-- **Cards from tool results:** `cards` in the answer come only from `proposeBooking` / `proposeCancellation` results, never from the model's text.
+- **Cards from tool results:** `cards` in the answer come only from `proposeBooking` / `proposeCancellation` results, never from the model's text. A reply that draws its own card or button ("[Confirm Booking]", "click to pay", "the card below") when no card was made is replaced with a message saying the card couldn't be prepared.
+- **Reply format:** the model is told to write short sentences and lists, never tables, and to list at most 6 showtimes before asking a question to narrow them down. The chat shows a table, if one still comes, as a list.
 - **Limits:** at most 6 tool calls per message, a 30-second timeout per model call and 90 seconds per message, `AI_USER_MESSAGE_LIMIT` messages per user per hour and `AI_VISITOR_MESSAGE_LIMIT` per network for visitors (`429`) and `AI_DAILY_REQUEST_CAP` model calls per day across all users.
 - **Answer length:** every model call sets a maximum answer length (4096 tokens on Gemini, 1024 on Groq).
 - **Models, in order** (`services/modelRouter.js`): `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, then the `GROQ_MODELS` (default `openai/gpt-oss-120b`, `openai/gpt-oss-20b`) when `GROQ_API_KEY` is set.
