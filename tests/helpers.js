@@ -11,6 +11,8 @@ process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = "test-secret";
 // Tests send many requests from one IP; the general limit is tested separately
 process.env.API_RATE_LIMIT = "100000";
+// Tests build their own showtimes; the schedule filler is tested separately
+process.env.SHOWTIME_AUTOFILL = "off";
 
 const { default: app } = await import("../app.js");
 const { default: User } = await import("../models/User.js");

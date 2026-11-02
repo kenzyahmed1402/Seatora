@@ -9,6 +9,7 @@ import { bookingSchema } from "../validators/bookingValidator.js";
 import { textParam } from "../utils/listQuery.js";
 import { DEFAULT_TIME_ZONE } from "../utils/timezone.js";
 import { findShowtimes, showtimeFilter } from "./showtimeService.js";
+import { keepScheduleFilled } from "./showtimeSchedule.js";
 import { cancellationQuoteFor, paidBookingFor, quoteSeats } from "./bookingService.js";
 
 // The only things the assistant can do. Read tools look things up; the two
@@ -112,6 +113,7 @@ export const agentTools = {
       to: { type: "string", maxLength: 40 },
     },
     run: async (user, args) => {
+      await keepScheduleFilled();
       const filter = await showtimeFilter({ ...args, upcoming: "true" });
       const showtimes = await findShowtimes(filter, { limit: MAX_RESULTS });
       return showtimes.map(showtimeSummary);

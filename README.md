@@ -178,6 +178,8 @@ npm run seed:demo -- --reset   # replaces the catalogue (refused in production o
 
 Adds a fictional catalogue: 3 cinemas with 2 screens each, 8 original movies, and showtimes for the next 7 days between 13:00 and 22:30 cinema time (`CINEMA_TZ`). Prices are $8–$16 per seat, with an evening surcharge from 17:00. Users and bookings are never changed.
 
+The schedule keeps itself filled: when showtimes are listed or the assistant searches them, the server plans the next 7 days again in the same way, at most once an hour (`services/showtimeSchedule.js`). A screen only gets showtimes on a day it has none, so nothing added by hand is overlapped or doubled. This uses only the demo cinemas and movies, found by name; any other catalogue is left alone. Set `SHOWTIME_AUTOFILL=off` to turn it off.
+
 ### Start the server
 
 ```bash
@@ -254,6 +256,7 @@ The app runs on Vercel as a single function (Vercel detects the Express app in `
 | `AI_USER_MESSAGE_LIMIT` | No    | `30`               | Messages to the assistant per user per hour.                                 |
 | `AI_VISITOR_MESSAGE_LIMIT` | No | `10`               | Messages to the assistant per hour from one network for visitors who haven't logged in. |
 | `GUEST_ACCOUNT_LIMIT` | No      | `10`               | Guest accounts that one network can create per hour.                         |
+| `SHOWTIME_AUTOFILL` | No        | on                 | `off` stops the demo schedule from planning the next 7 days by itself.       |
 | `SIGNUP_RATE_LIMIT` | No        | `10`               | New accounts (register, or a guest saving their account) that one network can create per hour. |
 | `ADMIN_NAME`      | No          | `Admin User`       | Used by `scripts/seedAdmin.js`.                                             |
 | `ADMIN_EMAIL`     | No          | `admin@cinema.com` | Used by `scripts/seedAdmin.js`.                                             |

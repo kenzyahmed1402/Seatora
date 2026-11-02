@@ -5,6 +5,7 @@ import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/AppError.js";
 import { getPagination, sendPage } from "../utils/listQuery.js";
 import { findShowtimes, showtimeFilter } from "../services/showtimeService.js";
+import { keepScheduleFilled } from "../services/showtimeSchedule.js";
 import { deleteShowtimesWhere } from "../utils/cascade.js";
 import { assertSeatsFit } from "../utils/seatLayout.js";
 
@@ -75,6 +76,7 @@ export const createShowtime = catchAsync(async (req, res) => {
 // Filters: see showtimeFilter. Each showtime comes with its movie, screen
 // and the screen's cinema.
 export const getShowtimes = catchAsync(async (req, res) => {
+  await keepScheduleFilled();
   const pagination = getPagination(req.query);
   const filter = await showtimeFilter(req.query);
   await sendPage(res, "showtimes", findShowtimes(filter, pagination), await Showtime.countDocuments(filter), pagination);
