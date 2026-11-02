@@ -36,8 +36,8 @@ export const confirmProposalHandler = catchAsync(async (req, res) => {
 // (booking or cancellation proposals) to show.
 export const sendMessage = catchAsync(async (req, res) => {
   const who = req.user ? { user: req.user } : { user: null, visitor: ensureVisitorId(req, res) };
-  const { reply, cards } = await chat(who, req.body.message.trim());
-  res.json({ status: "success", data: { reply, cards } });
+  const { reply, cards, showtimes } = await chat(who, req.body.message.trim());
+  res.json({ status: "success", data: { reply, cards, showtimes } });
 });
 
 // GET /agent/chat: the conversation so far, as shown on screen

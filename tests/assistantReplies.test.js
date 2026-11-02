@@ -26,7 +26,7 @@ describe("assistant replies", () => {
   it("tells the model how to format replies and never to draw cards", () => {
     const rules = systemInstruction(new Date());
     assert.match(rules, /never tables/);
-    assert.match(rules, /at most 6 showtimes/);
+    assert.match(rules, /don't list them yourself/);
     assert.match(rules, /Never write a card, a button/);
     assert.match(rules, /getAvailableSeats/);
   });

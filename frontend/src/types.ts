@@ -88,10 +88,24 @@ export type CancellationCard = {
 
 export type ProposalCard = BookingCard | CancellationCard;
 
+// A showtime the assistant found (its searchShowtimes result), shown under
+// its reply
+export type ChatShowtime = {
+  showtime: string;
+  movie: string;
+  genre: string;
+  cinema: string;
+  screen: number;
+  startTime: string;
+  pricePerSeat: number;
+  seatsAvailable: number;
+};
+
 export type ChatMessage = {
   role: "user" | "assistant";
   text: string;
   cards?: ProposalCard[];
+  showtimes?: ChatShowtime[];
   at?: string;
 };
 

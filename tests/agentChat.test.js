@@ -565,6 +565,31 @@ describe("assistant chat limits", () => {
     assert.deepEqual(calls, [DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL, DEFAULT_GROQ_MODELS[0]]);
   });
 
+  it("returns the showtimes a search found with the reply, and keeps them in the chat history", async () => {
+    const { alice, showtime } = await setup();
+    scriptedModel(ask(["searchShowtimes", {}]), say("I found 1 showtime. Shall I check the seats?"));
+    const res = await send(alice, "What's on?");
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.data.showtimes.map((s) => s.showtime), [String(showtime._id)]);
+    assert.deepEqual(Object.keys(res.body.data.showtimes[0]).sort(), [
+      "cinema", "durationMinutes", "genre", "localTime", "location", "movie", "pricePerSeat", "screen", "seatsAvailable", "showtime", "startTime",
+    ]);
+    const history = (await api.get("/agent/chat").set(alice.auth)).body.data.messages;
+    assert.equal(history.at(-1).showtimes.length, 1);
+  });
+
+  it("leaves the showtime list out once the message made a card", async () => {
+    const { alice, showtime } = await setup();
+    scriptedModel(
+      ask(["searchShowtimes", {}]),
+      ask(["proposeBooking", { showtime: String(showtime._id), seats: ["A1"] }]),
+      say("Here is the card for A1.")
+    );
+    const res = await send(alice, "Book A1 for the first showtime");
+    assert.equal(res.body.data.cards.length, 1);
+    assert.deepEqual(res.body.data.showtimes, []);
+  });
+
   it("replaces a reply that draws a card when no card was made", async () => {
     const { alice } = await setup();
     scriptedModel(say("Here’s a booking card for 2 seats (A1, A2).\n\n[Confirm Booking] (click to proceed to PayPal)"));

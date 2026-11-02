@@ -3,9 +3,10 @@ import { Armchair, ArrowUp, CircleAlert, RotateCcw, Sparkles } from "lucide-reac
 import { api, ApiError, errorMessage } from "../api";
 import { useAuth } from "../auth";
 import { useMediaQuery } from "../hooks";
-import type { Booking, ChatMessage, Proposal, ProposalCard } from "../types";
+import type { Booking, ChatMessage, ChatShowtime, Proposal, ProposalCard } from "../types";
 import { CinemaHall } from "../components/CinemaHall";
 import { MessageText } from "../components/MessageText";
+import { ShowtimeList } from "../components/ShowtimeList";
 import { ProposalTicket, type CardState } from "../components/ProposalTicket";
 
 const SUGGESTIONS = ["Sci-fi tonight for two", "Something funny tomorrow", "Downtown this weekend", "Cancel my booking"];
@@ -81,8 +82,12 @@ export const Chat = ({ initial }: { initial?: string }) => {
     setSending(true);
     setMessages((all) => [...all, { role: "user", text: message, isNew: true }]);
     try {
-      const { reply, cards: newCards } = await api<{ reply: string; cards: ProposalCard[] }>("POST", "/agent/chat", { message });
-      setMessages((all) => [...all, { role: "assistant", text: reply, cards: newCards, isNew: true }]);
+      const { reply, cards: newCards, showtimes } = await api<{ reply: string; cards: ProposalCard[]; showtimes?: ChatShowtime[] }>(
+        "POST",
+        "/agent/chat",
+        { message }
+      );
+      setMessages((all) => [...all, { role: "assistant", text: reply, cards: newCards, showtimes, isNew: true }]);
       if (newCards.length) setSelected(newCards[newCards.length - 1].proposal);
     } catch (err) {
       // The server keeps no failed turn: take the message back into the box
@@ -189,6 +194,7 @@ export const Chat = ({ initial }: { initial?: string }) => {
                     <MessageText text={message.text} />
                   </div>
                 )}
+                {message.showtimes && message.showtimes.length > 0 && <ShowtimeList showtimes={message.showtimes} />}
                 {message.cards?.map((card) => (
                   <ProposalTicket
                     key={card.proposal}
