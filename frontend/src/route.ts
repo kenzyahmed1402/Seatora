@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { reloadIfOutdated } from "./version";
 
 // Pages live after the # (e.g. /#/showtime/<id>), so the server only ever
 // serves one page and no page address can clash with an API path.
@@ -24,6 +25,8 @@ export const useRoute = () => {
   const [route, setRoute] = useState<Route>(parse);
   useEffect(() => {
     const onChange = () => {
+      // Moving to another page is a safe moment to load a newer version
+      if (reloadIfOutdated()) return;
       setRoute(parse());
       window.scrollTo(0, 0);
     };

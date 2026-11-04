@@ -766,6 +766,7 @@ Common status codes:
 | helmet            | Standard security headers; hides `X-Powered-By`                                            | —                 |
 | CORS              | Lets browser frontends call the API; any origin unless restricted                          | `CORS_ORIGIN`     |
 | Rate limiting     | 300 requests per IP per 15 minutes across the API, 10 failed login/register attempts per IP per 15 minutes (successes don't count), and 10 new accounts per IP per hour; then `429`. Counts are kept in MongoDB, shared by every running instance, with IPs stored only as hashes and deleted after the window | `API_RATE_LIMIT`, `AUTH_RATE_LIMIT`, `SIGNUP_RATE_LIMIT` |
+| App version       | Every response has `X-App-Version` (the deployed commit on Vercel, `dev` elsewhere). A page left open across a deploy sees a newer version and reloads once, at the next page change or after an assistant reply, never mid-checkout | — |
 | Proxy awareness   | Real client IPs for rate limiting when hosted behind a proxy                               | `TRUST_PROXY`     |
 | Password hashing  | bcrypt; passwords are never returned. A login for an unknown email takes as long as a wrong password, so it doesn't reveal which emails have accounts | —                 |
 

@@ -2,6 +2,8 @@
 // HTTP-only session cookie, which the browser sends by itself; this code
 // never sees or stores a token.
 
+import { noteServerVersion } from "./version";
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -25,6 +27,7 @@ export const api = async <T>(method: Method, path: string, body?: unknown): Prom
   } catch {
     throw new ApiError(0, "Can't reach the server. Check your connection and try again.");
   }
+  noteServerVersion(response.headers.get("x-app-version"));
 
   if (response.status === 204) {
     return undefined as T;

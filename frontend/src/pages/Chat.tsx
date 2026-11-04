@@ -7,6 +7,7 @@ import type { Booking, ChatMessage, ChatShowtime, Proposal, ProposalCard } from 
 import { CinemaHall } from "../components/CinemaHall";
 import { MessageText } from "../components/MessageText";
 import { ShowtimeList } from "../components/ShowtimeList";
+import { reloadIfOutdated } from "../version";
 import { ProposalTicket, type CardState } from "../components/ProposalTicket";
 
 const SUGGESTIONS = ["Sci-fi tonight for two", "Something funny tomorrow", "Downtown this weekend", "Cancel my booking"];
@@ -87,6 +88,9 @@ export const Chat = ({ initial }: { initial?: string }) => {
         "/agent/chat",
         { message }
       );
+      // Old code may not show everything in a reply; the reply is saved, so
+      // a newer version shows it in full after reloading
+      if (reloadIfOutdated()) return;
       setMessages((all) => [...all, { role: "assistant", text: reply, cards: newCards, showtimes, isNew: true }]);
       if (newCards.length) setSelected(newCards[newCards.length - 1].proposal);
     } catch (err) {

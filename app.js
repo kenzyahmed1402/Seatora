@@ -43,6 +43,14 @@ app.use(
     })
 );
 
+// Which deployment answered (Vercel sets the commit), so a page left open
+// across a deploy can tell it's out of date and reload (frontend/src/version.ts)
+const APP_VERSION = (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 12);
+app.use((req, res, next) => {
+    res.setHeader("X-App-Version", APP_VERSION);
+    next();
+});
+
 // The built web app (npm run build), with helmet's security headers. Served
 // here on every host, Vercel included: the fixed path below lets Vercel's
 // bundler include public/ with the app. Before the database connection and
