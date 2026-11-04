@@ -7,7 +7,9 @@ const apiPaths = ["/auth", "/movies", "/cinemas", "/screens", "/showTimes", "/bo
 
 // The deployment this build belongs to (Vercel sets the commit), compared
 // with the server's X-App-Version to spot a tab running old code
-const appVersion = (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 12);
+// (read through globalThis: the web app has no Node type definitions)
+const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
+const appVersion = (env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 12);
 
 export default defineConfig({
   plugins: [react()],
