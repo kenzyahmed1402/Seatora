@@ -67,6 +67,13 @@ describe("model cooling", () => {
     assert.deepEqual(modelsToTry(["a", "b"], now + 47000), ["a", "b"]);
   });
 
+  it("skips a model the provider doesn't know for 10 minutes, then tries it again", () => {
+    const notFound = apiError(404, { status: "NOT_FOUND", message: "models/gemini-none is not found" });
+    noteFailure("gemini:gemini-none", classifyFailure(notFound), notFound, now);
+    assert.deepEqual(modelsToTry(["gemini:gemini-none", "groq:x"], now + 9 * 60 * 1000), ["groq:x"]);
+    assert.deepEqual(modelsToTry(["gemini:gemini-none", "groq:x"], now + 10 * 60 * 1000 + 1), ["gemini:gemini-none", "groq:x"]);
+  });
+
   it("an answer clears it, and failures that don't repeat aren't remembered", () => {
     noteFailure("a", "busy", new Error("x"), now);
     noteSuccess("a");

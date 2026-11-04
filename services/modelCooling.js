@@ -1,7 +1,7 @@
 import { isDailyLimit, retryAfterMs } from "./modelFailures.js";
 
 // Models that just failed in a way that will repeat for a while (a rate
-// limit, an overload), and until when, so the next messages go straight to
+// limit, an overload, a model name the provider doesn't know), and until when, so the next messages go straight to
 // another model instead of spending a request to learn the same thing. Kept
 // in memory, so each running instance learns on its own; the assistant works
 // the same with it empty, only with more failed calls.
@@ -12,6 +12,9 @@ const LIMIT_DEFAULT_MS = MINUTE;
 const DAILY_LIMIT_MS = 60 * MINUTE;
 const MAX_COOLING_MS = 60 * MINUTE;
 const BUSY_MS = 15 * 1000;
+// A model the provider doesn't know (retired or misspelt): checked again
+// after this, in case it was a short glitch
+const MISSING_MS = 10 * MINUTE;
 
 const coolingUntil = new Map();
 
@@ -21,6 +24,7 @@ export const noteFailure = (model, kind, err, now = Date.now()) => {
   let ms;
   if (kind === "limit") ms = retryAfterMs(err) ?? (isDailyLimit(err) ? DAILY_LIMIT_MS : LIMIT_DEFAULT_MS);
   else if (kind === "busy") ms = BUSY_MS;
+  else if (kind === "missing") ms = MISSING_MS;
   else return;
   const until = now + Math.min(ms, MAX_COOLING_MS);
   coolingUntil.set(model, Math.max(coolingUntil.get(model) ?? 0, until));
