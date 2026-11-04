@@ -620,6 +620,18 @@ describe("assistant chat limits", () => {
     assert.equal(model.requests.length, 1);
   });
 
+  it("lists the showtimes of all the message's searches, and an empty search doesn't wipe them out", async () => {
+    const { alice, showtime } = await setup();
+    scriptedModel(
+      ask(["searchShowtimes", { genre: "Drama" }], ["searchShowtimes", { genre: "Comedy" }]),
+      ask(["searchShowtimes", { genre: "Drama" }]),
+      say("There is 1 drama and no comedy.")
+    );
+    const res = await send(alice, "Drama or comedy?");
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.data.showtimes.map((s) => s.showtime), [String(showtime._id)]);
+  });
+
   it("leaves the showtime list out once the message made a card", async () => {
     const { alice, showtime } = await setup();
     scriptedModel(

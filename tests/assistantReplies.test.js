@@ -28,10 +28,19 @@ describe("assistant replies", () => {
       "Here are the showtimes at Seatora Downtown for this weekend.",
       "Here are the 18 showtimes this Saturday.",
       "I found 4 comedy shows on Saturday.",
+      "Great! I see two comedy showtimes at Downtown this weekend.",
+      "There are 3 shows on Saturday.",
+      // Saying there are none without having searched is just as unchecked
+      "There are no showtimes matching that.",
     ]) {
       assert.equal(claimsShowtimes(reply), true, reply);
     }
-    for (const reply of ["Which movie or time would you like?", "How many seats would you like?", "There are no showtimes matching that."]) {
+    for (const reply of [
+      "Which movie or time would you like?",
+      "How many seats would you like?",
+      "Your booking for 2 seats is ready to confirm.",
+      "The show starts at 19:00.",
+    ]) {
       assert.equal(claimsShowtimes(reply), false, reply);
     }
   });

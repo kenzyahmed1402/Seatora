@@ -55,9 +55,26 @@ const NO_CARD =
 // weekend") when no search ran in that message: the customer would see no
 // list. The model is asked once to search, and that reminder and the wrong
 // reply are left out of the stored conversation.
-const SHOWTIMES_CLAIM =
-  /\b(here are|here's|here’s|these are|below are|i found|i've found|i’ve found|take a look at|showing)\b[^.?!\n]{0,60}\b(showtimes?|shows|screenings|movies|films|options|times)\b/i;
+const SHOWTIMES_CLAIM = new RegExp(
+  [
+    // "Here are the showtimes…", "I see two comedy showtimes…"
+    String.raw`\b(here are|here's|here’s|these are|below are|i found|i've found|i’ve found|i see|i can see|there are|we have|take a look at|showing)\b[^.?!\n]{0,60}\b(showtimes?|shows|screenings|movies|films|options|times)\b`,
+    // "two comedy showtimes", "18 shows", "a few screenings"
+    String.raw`\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a few|several)\b[^.?!\n]{0,30}\b(showtimes|shows|screenings)\b`,
+  ].join("|"),
+  "i"
+);
 export const claimsShowtimes = (reply) => SHOWTIMES_CLAIM.test(reply);
+
+// The showtimes of all the message's searches, for the chat's list: one
+// search per day or per genre ("comedy or action") all count, an empty
+// search doesn't wipe out an earlier one, and each showtime is listed once,
+// soonest first
+const MAX_LISTED = 30;
+const addShowtimes = (listed, found) =>
+  [...new Map([...listed, ...found].map((showtime) => [showtime.showtime, showtime])).values()]
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
+    .slice(0, MAX_LISTED);
 const SEARCH_REMINDER =
   "(Note from the app, not the customer: your reply says it shows showtimes, but you didn't call searchShowtimes in this turn, so the customer sees no list. Call searchShowtimes now with the filters they asked for, then reply in one or two sentences.)";
 
@@ -263,12 +280,12 @@ const runMessage = async (entry, owner, history, message, started) => {
       if (result.output?.card) {
         cards.push({ proposal: result.output.proposal, ...result.output.card });
       }
-      // The latest search's results, which the chat shows as a list. The
+      // The search results, which the chat shows as a list. The
       // model gets a shorter version: every call resends it, and the list
       // already shows the rest.
       let response = result;
       if (call.name === "searchShowtimes" && Array.isArray(result.output)) {
-        showtimes = result.output;
+        showtimes = addShowtimes(showtimes, result.output);
         response = { output: result.output.map(showtimeForModel) };
       }
       results.push({ functionResponse: { ...(call.id && { id: call.id }), name: call.name, response } });
