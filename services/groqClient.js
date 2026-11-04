@@ -10,8 +10,9 @@ const MODEL_NAME = /^[\w.:/-]{1,100}$/;
 
 // Groq's free tier allows 8K tokens per minute per model, counting the
 // request and the longest allowed answer. Older turns are left out so a
-// request stays near this size, and answers are kept short.
-export const GROQ_INPUT_TOKENS = 5000;
+// request stays near this size (the instructions and tools alone are about
+// 1.5K), and answers are kept short.
+export const GROQ_INPUT_TOKENS = 3500;
 export const GROQ_MAX_OUTPUT_TOKENS = 1024;
 
 // GROQ_MODELS (comma-separated), in the order they're tried

@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { book, bookedSeats, createShowtime, createUser, useTestDatabase } from "./helpers.js";
-import { runTool } from "../services/agentTools.js";
+import { runTool, showtimeForModel, toolDeclarations } from "../services/agentTools.js";
 import AgentProposal from "../models/AgentProposal.js";
 import Booking from "../models/Booking.js";
 import Payment from "../models/Payment.js";
@@ -48,6 +48,28 @@ describe("assistant tools", () => {
     assert.match(found[0].localTime, /\d{2}:\d{2}/);
 
     assert.deepEqual(await runTool(alice.user, "searchShowtimes", { genre: "Comedy" }), []);
+  });
+
+  it("search by days in cinema time, so the model never works out UTC windows", async () => {
+    // The showtime is at 19:00 UTC on 1 January 2030: 21:00 in Cairo
+    const { alice } = await setup();
+    const count = async (args) => (await runTool(alice.user, "searchShowtimes", args)).length;
+    assert.equal(await count({ date: "2030-01-01" }), 1);
+    assert.equal(await count({ date: "2030-01-02" }), 0);
+    assert.equal(await count({ date: "2029-12-31" }), 0);
+    assert.equal(await count({ date: "2029-12-31", untilDate: "2030-01-01" }), 1);
+    await assert.rejects(runTool(alice.user, "searchShowtimes", { untilDate: "1 Jan" }), refusal(400, /untilDate/));
+    const search = toolDeclarations.find((tool) => tool.name === "searchShowtimes");
+    assert.deepEqual(Object.keys(search.parametersJsonSchema.properties).sort(), ["area", "cinema", "date", "genre", "movie", "untilDate"]);
+  });
+
+  it("give the model only what it needs from each search result", async () => {
+    const { alice } = await setup();
+    const [found] = await runTool(alice.user, "searchShowtimes", {});
+    assert.deepEqual(Object.keys(showtimeForModel(found)).sort(), [
+      "cinema", "genre", "localTime", "movie", "pricePerSeat", "seatsAvailable", "showtime",
+    ]);
+    assert.ok(JSON.stringify(showtimeForModel(found)).length < JSON.stringify(found).length * 0.75);
   });
 
   it("show taken seats and quote prices without reserving anything", async () => {

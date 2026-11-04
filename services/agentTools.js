@@ -7,7 +7,7 @@ import AppError from "../utils/AppError.js";
 import { checkFields } from "../middlewares/validateRequest.js";
 import { bookingSchema } from "../validators/bookingValidator.js";
 import { textParam } from "../utils/listQuery.js";
-import { DEFAULT_TIME_ZONE } from "../utils/timezone.js";
+import { DEFAULT_TIME_ZONE, zonedTime } from "../utils/timezone.js";
 import { findShowtimes, showtimeFilter } from "./showtimeService.js";
 import { keepScheduleFilled } from "./showtimeSchedule.js";
 import { cancellationQuoteFor, paidBookingFor, quoteSeats } from "./bookingService.js";
@@ -52,6 +52,33 @@ const requireUser = (user) => {
   }
   return user;
 };
+
+// A day in the cinemas' time zone, as the model gives it
+const LOCAL_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+// date..untilDate (cinema days, inclusive) as the from/to window to search,
+// so the model never works out UTC times
+const localDays = (date, untilDate) => {
+  if (!date && !untilDate) return {};
+  const [year, month, day] = (date ?? untilDate).split("-").map(Number);
+  const [lastYear, lastMonth, lastDay] = (untilDate ?? date).split("-").map(Number);
+  return {
+    from: zonedTime({ year, month, day }, timeZone()).toISOString(),
+    to: zonedTime({ year: lastYear, month: lastMonth, day: lastDay + 1 }, timeZone()).toISOString(),
+  };
+};
+
+// What the model is told about a search result: what it needs to talk about
+// a showtime and book it. The chat's list gets the whole summary.
+export const showtimeForModel = (summary) => ({
+  showtime: summary.showtime,
+  movie: summary.movie,
+  genre: summary.genre,
+  cinema: summary.cinema,
+  localTime: summary.localTime,
+  pricePerSeat: summary.pricePerSeat,
+  seatsAvailable: summary.seatsAvailable,
+});
 
 const showtimeSummary = (showtime) => ({
   showtime: String(showtime._id),
@@ -102,19 +129,18 @@ export const agentTools = {
   searchShowtimes: {
     description:
       "Find upcoming showtimes. Filters: area (text in the cinema's location), cinema or movie ID, genre, " +
-      "date (UTC day like 2030-03-01), from/to (date-times). Soonest first, at most 20.",
+      "date (a day in cinema time), untilDate (last day of a range, inclusive). Soonest first, at most 20.",
     args: {
       area: { type: "string", maxLength: 100 },
       cinema: { type: "ObjectId" },
       movie: { type: "ObjectId" },
       genre: { type: "string", enum: allowedGenres },
-      date: { type: "string", maxLength: 10 },
-      from: { type: "string", maxLength: 40 },
-      to: { type: "string", maxLength: 40 },
+      date: { type: "string", pattern: LOCAL_DAY, description: "YYYY-MM-DD, cinema time" },
+      untilDate: { type: "string", pattern: LOCAL_DAY, description: "YYYY-MM-DD, cinema time" },
     },
-    run: async (user, args) => {
+    run: async (user, { date, untilDate, ...args }) => {
       await keepScheduleFilled();
-      const filter = await showtimeFilter({ ...args, upcoming: "true" });
+      const filter = await showtimeFilter({ ...args, ...localDays(date, untilDate), upcoming: "true" });
       const showtimes = await findShowtimes(filter, { limit: MAX_RESULTS });
       return showtimes.map(showtimeSummary);
     },
@@ -272,6 +298,7 @@ const jsonSchema = (rules) => {
   }
   return {
     type: rules.type,
+    ...(rules.description && { description: rules.description }),
     ...(rules.enum && { enum: rules.enum }),
     ...(rules.maxLength && { maxLength: rules.maxLength }),
   };
