@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { claimsShowtimes, compactHistory, drawsCard, systemInstruction } from "../services/agentChat.js";
+import { claimsShowtimes, compactHistory, drawsCard, systemInstruction, withoutIds } from "../services/agentChat.js";
 
 describe("assistant replies", () => {
   it("spots a reply that draws its own card or button", () => {
@@ -43,6 +43,19 @@ describe("assistant replies", () => {
     ]) {
       assert.equal(claimsShowtimes(reply), false, reply);
     }
+  });
+
+  it("takes IDs out of replies, and nothing else", () => {
+    const id = "6908a1b2c3d4e5f6a7b8c9d0";
+    assert.equal(withoutIds(`The Crumb Conspiracy (ID: ${id}) at 15:00.`), "The Crumb Conspiracy at 15:00.");
+    assert.equal(
+      withoutIds(`- Sat 13:00 · Starlit Garden · showtime ID ${id}\n- Sun 18:00 · Velocity Run [${id}]`),
+      "- Sat 13:00 · Starlit Garden\n- Sun 18:00 · Velocity Run"
+    );
+    for (const text of ["Seats A1-A2 are free.", "Price: $11 - evening", "Your booking ref is ABC123."]) {
+      assert.equal(withoutIds(text), text);
+    }
+    assert.match(systemInstruction(new Date()), /never IDs/);
   });
 
   it("shortens earlier search results, so the model searches again instead of listing from memory", () => {

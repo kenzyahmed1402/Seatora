@@ -61,7 +61,7 @@ export const toGeminiContents = (contents) => {
 const createGeminiClient = (apiKey) => {
   const ai = new GoogleGenAI({ apiKey });
   return {
-    generate: async ({ model, systemInstruction, contents, functionDeclarations, timeoutMs, maxOutputTokens }) => {
+    generate: async ({ model, systemInstruction, contents, functionDeclarations, timeoutMs, maxOutputTokens, requiredTool }) => {
       const response = await ai.models.generateContent({
         model,
         contents: toGeminiContents(contents),
@@ -70,6 +70,8 @@ const createGeminiClient = (apiKey) => {
           tools: [{ functionDeclarations }],
           ...(maxOutputTokens && { maxOutputTokens }),
           ...(model.startsWith("gemini-3") && { thinkingConfig: { thinkingLevel: "low" } }),
+          // The model must call this tool now (see agentChat.js)
+          ...(requiredTool && { toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: [requiredTool] } } }),
           httpOptions: { timeout: timeoutMs },
         },
       });

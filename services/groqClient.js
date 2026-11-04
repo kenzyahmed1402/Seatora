@@ -142,7 +142,7 @@ const createGroqClient = (apiKey, fetchFn = fetch) => {
   };
 
   return {
-    generate: async ({ model, systemInstruction, contents, functionDeclarations, timeoutMs, maxOutputTokens }) => {
+    generate: async ({ model, systemInstruction, contents, functionDeclarations, timeoutMs, maxOutputTokens, requiredTool }) => {
       const tools = functionDeclarations.map(({ name, description, parametersJsonSchema }) => ({
         type: "function",
         function: { name, description, parameters: parametersJsonSchema },
@@ -151,7 +151,8 @@ const createGroqClient = (apiKey, fetchFn = fetch) => {
         model,
         messages: fitMessages(toGroqMessages(systemInstruction, contents), tools),
         tools,
-        tool_choice: "auto",
+        // The model must call requiredTool now (see agentChat.js)
+        tool_choice: requiredTool ? { type: "function", function: { name: requiredTool } } : "auto",
         max_completion_tokens: Math.min(maxOutputTokens ?? GROQ_MAX_OUTPUT_TOKENS, GROQ_MAX_OUTPUT_TOKENS),
         // gpt-oss thinks before answering; its thinking counts against the limits
         ...(model.startsWith("openai/gpt-oss") && { reasoning_effort: "low" }),
@@ -160,9 +161,12 @@ const createGroqClient = (apiKey, fetchFn = fetch) => {
       try {
         data = await send(body, timeoutMs);
       } catch (err) {
-        // A model that doesn't take reasoning_effort: once more without it
-        if (err.status !== 400 || !body.reasoning_effort || !/reasoning_effort/i.test(err.message)) throw err;
+        // A model that doesn't take reasoning_effort, or a required tool:
+        // once more without them
+        const refused = err.status === 400 && /reasoning_effort|tool_choice/i.test(err.message);
+        if (!refused || (!body.reasoning_effort && body.tool_choice === "auto")) throw err;
         delete body.reasoning_effort;
+        body.tool_choice = "auto";
         data = await send(body, timeoutMs);
       }
       return fromGroqMessage(data?.choices?.[0]?.message);

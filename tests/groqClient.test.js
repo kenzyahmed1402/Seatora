@@ -155,6 +155,23 @@ describe("groq client", () => {
     assert.equal(classifyFailure(await createGroqClientForTest("k", hidden.fetchFn).generate(request).catch((e) => e)), "busy");
   });
 
+  it("names the tool the model must call, and drops that if the model refuses it", async () => {
+    const forced = fakeFetch({ body: { choices: [{ message: { content: "Hi!" } }] } });
+    await createGroqClientForTest("k", forced.fetchFn).generate({ ...request, requiredTool: "searchShowtimes" });
+    assert.deepEqual(forced.requests[0].body.tool_choice, { type: "function", function: { name: "searchShowtimes" } });
+
+    const free = fakeFetch({ body: { choices: [{ message: { content: "Hi!" } }] } });
+    await createGroqClientForTest("k", free.fetchFn).generate(request);
+    assert.equal(free.requests[0].body.tool_choice, "auto");
+
+    const refused = fakeFetch(
+      { status: 400, body: { error: { message: "tool_choice is not supported" } } },
+      { body: { choices: [{ message: { content: "Hi!" } }] } }
+    );
+    await createGroqClientForTest("k", refused.fetchFn).generate({ ...request, requiredTool: "searchShowtimes" });
+    assert.equal(refused.requests[1].body.tool_choice, "auto");
+  });
+
   it("tries once more without reasoning_effort if the model refuses it", async () => {
     const { fetchFn, requests } = fakeFetch(
       { status: 400, body: { error: { message: "reasoning_effort is not supported with this model" } } },

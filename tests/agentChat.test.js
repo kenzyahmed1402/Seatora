@@ -595,12 +595,16 @@ describe("assistant chat limits", () => {
       say("Here are the showtimes at Downtown this weekend."),
       (request) => {
         assert.match(request.contents.at(-1).parts[0].text, /you didn't call searchShowtimes/);
+        // A reminder can be ignored: this call must use the tool
+        assert.equal(request.requiredTool, "searchShowtimes");
         return ask(["searchShowtimes", {}]);
       },
       say("Here is 1 showtime at Downtown this weekend.")
     );
     const res = await send(alice, "Downtown this weekend");
     assert.equal(res.status, 200);
+    assert.equal(model.requests[0].requiredTool, undefined);
+    assert.equal(model.requests[2].requiredTool, undefined);
     assert.equal(res.body.data.reply, "Here is 1 showtime at Downtown this weekend.");
     assert.equal(res.body.data.showtimes.length, 1);
 
