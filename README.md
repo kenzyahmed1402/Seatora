@@ -1,4 +1,4 @@
-# Cinema Booking Backend
+# Seatora - Cinema Booking Backend
 
 A REST API for running a cinema booking system, built with **Node.js**, **Express 5** and **MongoDB (Mongoose)**.
 
