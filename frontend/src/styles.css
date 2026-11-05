@@ -724,6 +724,9 @@ nav a[aria-current="page"]::after {
   width: 76px;
   aspect-ratio: 2 / 3;
   flex: none;
+  /* in a row, stay a 2:3 thumbnail at the top instead of stretching to
+     the row's height (which phones did) */
+  align-self: flex-start;
   padding: 0;
 }
 
