@@ -2127,6 +2127,17 @@ button.seat:disabled {
   animation: flipIn 0.75s var(--ease-out) both;
 }
 
+/* ---------- paying on the chat's booking card ---------- */
+
+.ticket-pay {
+  padding: 0 18px 18px;
+}
+
+.chat-ticket {
+  display: grid;
+  gap: 12px;
+}
+
 /* ---------- my bookings ---------- */
 
 .bookings-page {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   Armchair,
@@ -15,9 +15,11 @@ import { api } from "../api";
 import { money } from "../format";
 import { href } from "../route";
 import { clock, useSecondsLeft } from "../hooks";
-import type { Booking, ProposalCard, SeatMap } from "../types";
+import type { Booking, BookingDetail, ProposalCard, SeatMap } from "../types";
 import { CinemaHall } from "./CinemaHall";
+import { PayPalButton } from "./PayPalButton";
 import { Poster } from "./Poster";
+import { TicketCard } from "./TicketCard";
 
 // What the page knows about a card: the server's word on its status, and
 // what happened when the customer pressed Confirm
@@ -26,6 +28,10 @@ export type CardState = {
   booking?: Booking;
   // The booking a confirmed card made or cancelled
   bookingId?: string;
+  // Paid: the ticket, shown in place of the card
+  ticket?: BookingDetail;
+  // Paid on this visit, so the card turns over into the ticket
+  justPaid?: boolean;
   busy?: boolean;
   error?: string;
 };
@@ -34,6 +40,8 @@ type Props = {
   card: ProposalCard;
   state: CardState;
   onConfirm: (card: ProposalCard) => void;
+  // PayPal accepted and the server confirmed the booking
+  onPaid?: (card: ProposalCard, booking: Booking) => void;
   // compact: a short ticket in the conversation, opened in the side panel
   variant: "full" | "compact";
   selected?: boolean;
@@ -65,11 +73,18 @@ const TicketHall = ({ showtime, seats }: { showtime: string; seats: string[] }) 
   );
 };
 
-export const ProposalTicket = ({ card, state, onConfirm, variant, selected, onSelect }: Props) => {
+export const ProposalTicket = ({ card, state, onConfirm, onPaid, variant, selected, onSelect }: Props) => {
   const booking = card.type === "booking";
   const offerLeft = useSecondsLeft(state.status === "open" ? card.expiresAt : undefined);
   const holdLeft = useSecondsLeft(state.booking?.holdExpiresAt);
   const status = state.status === "open" && offerLeft === 0 ? "expired" : state.status;
+  // Seats held and not paid yet: PayPal right on the card
+  const bookingId = state.booking?._id ?? state.bookingId;
+  const payable = booking && status === "confirmed" && !state.ticket && Boolean(state.booking?.holdExpiresAt && holdLeft > 0);
+  // PayPal's buttons need one function for the card's whole life
+  const paid = useRef(onPaid);
+  paid.current = onPaid;
+  const handlePaid = useRef((done: Booking) => paid.current?.(card, done)).current;
 
   const facts = (
     <ul className="ticket-facts">
@@ -123,17 +138,15 @@ export const ProposalTicket = ({ card, state, onConfirm, variant, selected, onSe
       );
     }
     if (status === "confirmed") {
-      const bookingId = state.booking?._id ?? state.bookingId;
-      const held = Boolean(state.booking?.holdExpiresAt && holdLeft > 0);
       return (
         <>
           <p className="ticket-status done">
             <Check size={16} aria-hidden="true" />
-            {booking ? (held ? `Seats held · ${clock(holdLeft)} left` : "Booked") : "Cancelled · refund on its way"}
+            {booking ? (payable ? `Seats held · ${clock(holdLeft)} left` : "Booked") : "Cancelled · refund on its way"}
           </p>
-          {booking && bookingId && (
+          {booking && bookingId && !payable && (
             <a className="button primary" href={href("booking", bookingId)}>
-              {held ? "Pay now" : "View booking"} <ArrowRight size={16} aria-hidden="true" />
+              View booking <ArrowRight size={16} aria-hidden="true" />
             </a>
           )}
         </>
@@ -174,10 +187,25 @@ export const ProposalTicket = ({ card, state, onConfirm, variant, selected, onSe
           </div>
         </div>
         <button type="button" className="ticket-open" onClick={onSelect} aria-pressed={selected}>
-          {status === "confirmed" ? "Confirmed" : status === "expired" ? "Expired" : "View"}
+          {state.ticket ? "Paid" : payable ? "Pay" : status === "confirmed" ? "Confirmed" : status === "expired" ? "Expired" : "View"}
           <ArrowRight size={15} aria-hidden="true" />
         </button>
       </article>
+    );
+  }
+
+  // Paid: the card turns over into the ticket, with the full ticket a tap away
+  if (state.ticket) {
+    return (
+      <div className={state.justPaid ? "chat-ticket ticket-flip in" : "chat-ticket"}>
+        <p className="booking-done">
+          <Check size={18} aria-hidden="true" /> Paid · enjoy the film
+        </p>
+        <TicketCard booking={state.ticket} />
+        <a className="button secondary wide" href={href("booking", state.ticket._id)}>
+          Open full ticket <ArrowRight size={16} aria-hidden="true" />
+        </a>
+      </div>
     );
   }
 
@@ -206,6 +234,12 @@ export const ProposalTicket = ({ card, state, onConfirm, variant, selected, onSe
           )}
         </div>
       </div>
+
+      {payable && bookingId && (
+        <div className="ticket-pay">
+          <PayPalButton bookingId={bookingId} onPaid={handlePaid} />
+        </div>
+      )}
 
       {state.error && (
         <p className="ticket-error" role="alert">

@@ -3,7 +3,7 @@ import { Armchair, ArrowUp, CircleAlert, RotateCcw, Sparkles } from "lucide-reac
 import { api, ApiError, errorMessage } from "../api";
 import { useAuth } from "../auth";
 import { useMediaQuery } from "../hooks";
-import type { Booking, ChatMessage, ChatShowtime, Proposal, ProposalCard } from "../types";
+import type { Booking, BookingDetail, ChatMessage, ChatShowtime, Proposal, ProposalCard } from "../types";
 import { CinemaHall } from "../components/CinemaHall";
 import { MessageText } from "../components/MessageText";
 import { ShowtimeList } from "../components/ShowtimeList";
@@ -47,21 +47,43 @@ export const Chat = ({ initial }: { initial?: string }) => {
   const cards = useMemo(() => messages.flatMap((message) => message.cards ?? []), [messages]);
   const panelCard = cards.find((card) => card.proposal === selected) ?? cards[cards.length - 1];
 
-  // Ask the server where each card stands: open, confirmed, or gone
+  // Ask the server where each card stands: open, confirmed, or gone. A
+  // confirmed booking card also needs its booking: still held (pay on the
+  // card) or paid (show the ticket).
   useEffect(() => {
     for (const card of cards) {
       if (cardStates[card.proposal]) continue;
       setCardStates((all) => ({ ...all, [card.proposal]: { status: "loading" } }));
       api<{ proposal: Proposal }>("GET", `/agent/proposals/${card.proposal}`)
-        .then(({ proposal }) =>
-          setCardStates((all) => ({ ...all, [card.proposal]: { status: proposal.status === "confirmed" ? "confirmed" : "open", bookingId: proposal.result } }))
-        )
+        .then(async ({ proposal }) => {
+          const confirmed = proposal.status === "confirmed";
+          const state: CardState = { status: confirmed ? "confirmed" : "open", bookingId: proposal.result };
+          if (confirmed && card.type === "booking" && proposal.result) {
+            const detail = await api<{ booking: BookingDetail }>("GET", `/bookings/${proposal.result}`)
+              .then((data) => data.booking)
+              .catch(() => null);
+            if (detail?.status === "confirmed") state.ticket = detail;
+            else if (detail?.status === "pending") state.booking = { _id: detail._id, seats: detail.seats, status: detail.status, totalPrice: detail.totalPrice, holdExpiresAt: detail.holdExpiresAt };
+          }
+          setCardStates((all) => ({ ...all, [card.proposal]: state }));
+        })
         .catch(() => setCardStates((all) => ({ ...all, [card.proposal]: { status: "expired" } })));
     }
   }, [cards, cardStates]);
 
   const updateCard = (id: string, change: Partial<CardState>) =>
     setCardStates((all) => ({ ...all, [id]: { ...all[id], ...change } }));
+
+  // Paid with PayPal on the card: the card turns into the ticket
+  const paid = async (card: ProposalCard, booking: Booking) => {
+    updateCard(card.proposal, { booking: { ...booking, holdExpiresAt: undefined } });
+    try {
+      const { booking: detail } = await api<{ booking: BookingDetail }>("GET", `/bookings/${booking._id}`);
+      updateCard(card.proposal, { ticket: detail, justPaid: true, error: "" });
+    } catch {
+      updateCard(card.proposal, { error: "Paid. Open My bookings to see your ticket." });
+    }
+  };
 
   const confirm = async (card: ProposalCard) => {
     const signedIn = await requireUser(
@@ -208,6 +230,7 @@ export const Chat = ({ initial }: { initial?: string }) => {
                     card={card}
                     state={stateOf(card)}
                     onConfirm={confirm}
+                    onPaid={paid}
                     variant={wide ? "compact" : "full"}
                     selected={wide && panelCard?.proposal === card.proposal}
                     onSelect={() => setSelected(card.proposal)}
@@ -259,7 +282,14 @@ export const Chat = ({ initial }: { initial?: string }) => {
             <Armchair size={18} aria-hidden="true" /> Your booking
           </h2>
           {panelCard ? (
-            <ProposalTicket key={panelCard.proposal} card={panelCard} state={stateOf(panelCard)} onConfirm={confirm} variant="full" />
+            <ProposalTicket
+              key={panelCard.proposal}
+              card={panelCard}
+              state={stateOf(panelCard)}
+              onConfirm={confirm}
+              onPaid={paid}
+              variant="full"
+            />
           ) : (
             <div className="panel-empty card">
               <CinemaHall className="ticket-hall" rows={8} seatsPerRow={12} stateOf={emptyHall} label="An empty cinema hall" />

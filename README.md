@@ -538,7 +538,7 @@ The booking assistant can only use the tools in `services/agentTools.js`. Each r
 
 A card is saved as an `AgentProposal` and can be confirmed for 15 minutes with `POST /agent/proposals/:id/confirm`, which re-checks everything first:
 
-- **Booking card:** the seats must still be free and the price the same as on the card (otherwise `409` with the new price); then the seats are held as a `pending` booking, paid next with `POST /payments/orders`.
+- **Booking card:** the seats must still be free and the price the same as on the card (otherwise `409` with the new price); then the seats are held as a `pending` booking, paid next with `POST /payments/orders`. In the web app the PayPal button appears on the card itself, with the hold's countdown, so the customer pays without leaving the chat; once the server has captured and verified the payment, the card turns into the ticket, with a link to the full ticket page (print, save image, save a guest's booking).
 - **Cancellation card:** the refund must still be the one on the card (otherwise `409` with the new amount, nothing refunded); then the booking is cancelled with that refund.
 - **Once only:** confirming again returns the first result, so a double click can't book or refund twice. A failed confirm changes nothing and can be retried; an expired card answers `410`; another user's card is `404`.
 
