@@ -78,6 +78,8 @@ const normalizeError = (err) => {
 
 const errorHandler = (err, req, res, next) => {
   const error = normalizeError(err);
+  // An error is never kept by a cache, even on a route that allows caching
+  res.setHeader('Cache-Control', 'no-store');
 
   // Stack traces and internal error details only in development. Any other
   // value, including a forgotten NODE_ENV, gets the safe production response.

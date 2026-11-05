@@ -9,10 +9,12 @@ import {
 import validateObjectId from "../middlewares/validateObjectId.js";
 import { validateMovie, validateMovieUpdate } from "../validators/movieValidator.js";
 import { protect, restrictTo } from "../middlewares/auth.js";
+import publicCache from "../middlewares/publicCache.js";
 
 const MoviesRouter = express.Router();
 
-MoviesRouter.get("/", getMovies);
+// The same for everyone, so the CDN can keep it briefly (the home page)
+MoviesRouter.get("/", publicCache(30, 300), getMovies);
 MoviesRouter.get("/:id", validateObjectId(), getMovieById);
 MoviesRouter.post("/", protect, restrictTo("ADMIN"), validateMovie, createMovie);
 MoviesRouter.put("/:id", protect, restrictTo("ADMIN"), validateObjectId(), validateMovieUpdate, updateMovie);

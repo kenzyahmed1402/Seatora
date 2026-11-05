@@ -113,3 +113,20 @@ describe("price quotes", () => {
     assert.match(booking.body.message, /already started/);
   });
 });
+
+describe("caching the public lists", () => {
+  it("lets the CDN keep the movie and showtime lists briefly, never errors or seat maps", async () => {
+    const c = await catalogue();
+    for (const path of ["/showTimes?upcoming=true", "/movies"]) {
+      const res = await api.get(path);
+      assert.equal(res.status, 200, path);
+      assert.equal(res.headers["cache-control"], "public, max-age=0, s-maxage=30, stale-while-revalidate=300", path);
+    }
+    const refused = await api.get("/showTimes?genre=Opera");
+    assert.equal(refused.status, 400);
+    assert.equal(refused.headers["cache-control"], "no-store");
+    const seats = await api.get(`/showTimes/${c.tonight._id}/seats`);
+    assert.equal(seats.status, 200);
+    assert.equal(seats.headers["cache-control"], undefined);
+  });
+});
