@@ -93,7 +93,7 @@ export const ShowtimePage = ({ id, seats }: { id?: string; seats?: string }) => 
   };
 
   const hold = async () => {
-    const signedIn = await requireUser("Log in to hold your seats");
+    const signedIn = await requireUser("Who are these seats for?", { booking: true });
     if (!signedIn || !id) return;
     setHolding(true);
     setHoldError("");

@@ -49,10 +49,12 @@ export const signupLimiter = rateLimit({
     next(new AppError("Too many new accounts from this network. Please try again in an hour.", 429)),
 });
 
-// Limits new guest accounts per IP, so a script can't create thousands
+// Limits new guest accounts per IP, so a script can't create thousands.
+// Only accounts actually created count, so typos in the guest's details don't.
 export const guestLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: Number(process.env.GUEST_ACCOUNT_LIMIT) || 10,
+  skipFailedRequests: true,
   store: new MongoRateLimitStore("guest:"),
   passOnStoreError: true,
   standardHeaders: "draft-8",

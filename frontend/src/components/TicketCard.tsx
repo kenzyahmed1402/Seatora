@@ -1,4 +1,4 @@
-import { Armchair, CalendarDays, Check, MapPin, Ticket } from "lucide-react";
+import { Armchair, CalendarDays, Check, MapPin, Ticket, User } from "lucide-react";
 import { longDate, money } from "../format";
 import type { BookingDetail } from "../types";
 import { Poster } from "./Poster";
@@ -32,6 +32,15 @@ export const TicketCard = ({ booking }: { booking: BookingDetail }) => {
             <li>
               <MapPin size={15} aria-hidden="true" /> {showtime.screen.cinema?.name ?? "Cinema"} · Screen {showtime.screen.screenNumber}
             </li>
+            {booking.customerName && (
+              <li>
+                <User size={15} aria-hidden="true" />
+                {/* older guest bookings have an unreachable .invalid address: not shown */}
+                {[booking.customerName, booking.customerEmail, booking.customerPhone]
+                  .filter((value) => value && !value.endsWith(".invalid"))
+                  .join(" · ")}
+              </li>
+            )}
             <li>
               <Armchair size={15} aria-hidden="true" />
               <span className="seat-tags">

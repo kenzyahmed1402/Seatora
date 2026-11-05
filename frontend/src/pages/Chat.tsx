@@ -64,7 +64,10 @@ export const Chat = ({ initial }: { initial?: string }) => {
     setCardStates((all) => ({ ...all, [id]: { ...all[id], ...change } }));
 
   const confirm = async (card: ProposalCard) => {
-    const signedIn = await requireUser(card.type === "booking" ? "Log in to hold your seats" : "Log in to cancel your booking");
+    const signedIn = await requireUser(
+      card.type === "booking" ? "Who are these seats for?" : "Log in to cancel your booking",
+      { booking: card.type === "booking" }
+    );
     if (!signedIn) return;
     updateCard(card.proposal, { busy: true, error: "" });
     try {

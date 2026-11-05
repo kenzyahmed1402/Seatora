@@ -35,13 +35,20 @@ afterEach(() => setModelClient(null));
 
 const lastResults = (request) => request.contents.at(-1).parts.map((part) => part.functionResponse.response);
 
+// What a guest gives before booking
+const GUEST = { name: "Nour Hassan", email: "Nour@Example.com", phone: "+20 100-123 4567" };
+
 describe("guest accounts", () => {
-  it("are created with one click and logged in through the cookie", async () => {
-    const res = await api.post("/auth/guest");
+  it("are created with the guest's name, email and phone, and logged in through the cookie", async () => {
+    const res = await api.post("/auth/guest").send(GUEST);
     assert.equal(res.status, 201);
     const user = res.body.data.user;
     assert.equal(user.isGuest, true);
     assert.equal(user.role, "CUSTOMER");
+    assert.equal(user.name, "Nour Hassan");
+    assert.equal(user.contactEmail, "nour@example.com");
+    assert.equal(user.phone, "+201001234567");
+    // The email is for contact only: the login stays a random, unreachable address
     assert.match(user.email, /@guest\.invalid$/);
     assert.ok(user.guestExpiresAt);
 
@@ -50,10 +57,41 @@ describe("guest accounts", () => {
     assert.equal(me.body.data.user._id, user._id);
   });
 
+  it("need a valid name, email and phone, and typos don't use up the limit", async () => {
+    const cases = [
+      [{}, /name is required/],
+      [{ ...GUEST, phone: "12345" }, /phone must be a phone number/],
+      [{ ...GUEST, phone: "call me" }, /phone must be a phone number/],
+      [{ ...GUEST, email: "nour@guest.invalid" }, /email must be an address you can receive mail at/],
+      [{ ...GUEST, name: "Admin" }, /reserved/],
+    ];
+    for (const [body, message] of cases) {
+      const res = await api.post("/auth/guest").send(body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      assert.match(res.body.message, message);
+    }
+    for (let i = 0; i < 10; i++) assert.equal((await api.post("/auth/guest").send(GUEST)).status, 201);
+  });
+
+  it("put the guest's name, email and phone on their bookings", async () => {
+    const admin = await createUser("ADMIN");
+    const { showtime } = await createShowtime(admin);
+    const guest = await api.post("/auth/guest").send(GUEST);
+    const booked = await api
+      .post("/bookings")
+      .set("Cookie", cookieHeader(cookiesFrom(guest)))
+      .send({ showtime: showtime._id, seats: ["A1"] });
+    assert.equal(booked.status, 201);
+    const booking = await Booking.findById(booked.body.data.booking._id);
+    assert.equal(booking.customerName, "Nour Hassan");
+    assert.equal(booking.customerEmail, "nour@example.com");
+    assert.equal(booking.customerPhone, "+201001234567");
+  });
+
   it("are kept once they book, and can become a normal account with their bookings", async () => {
     const admin = await createUser("ADMIN");
     const { showtime } = await createShowtime(admin);
-    const guest = await api.post("/auth/guest");
+    const guest = await api.post("/auth/guest").send(GUEST);
     const cookie = cookieHeader(cookiesFrom(guest));
 
     const booked = await api.post("/bookings").set("Cookie", cookie).send({ showtime: showtime._id, seats: ["A1"] });
@@ -79,15 +117,15 @@ describe("guest accounts", () => {
     const body = { name: "Xavier", email: alice.user.email, password: "a-long-password" };
     assert.equal((await api.post("/auth/upgrade").set(alice.auth).send(body)).status, 409);
 
-    const guest = await api.post("/auth/guest");
+    const guest = await api.post("/auth/guest").send(GUEST);
     const taken = await api.post("/auth/upgrade").set("Cookie", cookieHeader(cookiesFrom(guest))).send(body);
     assert.equal(taken.status, 409);
     assert.equal((await api.post("/auth/upgrade").send(body)).status, 401);
   });
 
   it("are limited per network", async () => {
-    for (let i = 0; i < 10; i++) assert.equal((await api.post("/auth/guest")).status, 201);
-    const limited = await api.post("/auth/guest");
+    for (let i = 0; i < 10; i++) assert.equal((await api.post("/auth/guest").send(GUEST)).status, 201);
+    const limited = await api.post("/auth/guest").send(GUEST);
     assert.equal(limited.status, 429);
     assert.match(limited.body.message, /Too many guest accounts/);
   });
@@ -145,7 +183,7 @@ describe("visitors who haven't logged in", () => {
     const chat = await api.post("/agent/chat").send({ message: "One seat" });
     const [card] = chat.body.data.cards;
 
-    const guest = await api.post("/auth/guest").set("Cookie", cookieHeader(cookiesFrom(chat)));
+    const guest = await api.post("/auth/guest").send(GUEST).set("Cookie", cookieHeader(cookiesFrom(chat)));
     const session = cookiesFrom(guest).filter((c) => c.startsWith("seatora_session="));
     const confirmed = await api.post(`/agent/proposals/${card.proposal}/confirm`).set("Cookie", cookieHeader(session));
     assert.equal(confirmed.status, 200, JSON.stringify(confirmed.body));

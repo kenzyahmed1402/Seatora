@@ -101,9 +101,10 @@ const PayPalButton = ({ bookingId, onPaid }: { bookingId: string; onPaid: (booki
 // A guest's account becomes a normal one, so the booking isn't lost when
 // this browser's cookie goes
 const SaveBooking = () => {
-  const { upgrade } = useAuth();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const { user, upgrade } = useAuth();
+  // Starts with the details the guest gave before booking
+  const [name, setName] = useState(user?.name ?? "");
+  const [email, setEmail] = useState(user?.contactEmail ?? "");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

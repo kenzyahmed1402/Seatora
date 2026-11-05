@@ -109,8 +109,11 @@ export const holdSeats = async (user, { showtime, seats }) => {
       showtime,
       seats,
       user: user._id,
+      // A guest's contact email and phone, given before booking; an
+      // account's own email
       customerName: user.name,
-      customerEmail: user.email,
+      customerEmail: user.contactEmail || user.email,
+      ...(user.phone && { customerPhone: user.phone }),
       status: "pending",
       holdExpiresAt: holdExpiry(),
       totalPrice: priceFor(showtimeDoc, seats),

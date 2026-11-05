@@ -6,6 +6,9 @@ export type User = {
   email: string;
   role: "CUSTOMER" | "ADMIN";
   isGuest?: boolean;
+  // A guest's contact details
+  contactEmail?: string;
+  phone?: string;
 };
 
 export type Movie = {
@@ -131,6 +134,10 @@ export type Booking = {
 export type BookingDetail = {
   _id: string;
   seats: string[];
+  // Who the booking is for
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   totalPrice: number;
   status: "pending" | "confirmed" | "cancelled" | "expired" | "refunded" | "needs_review";
   holdExpiresAt?: string;

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { emailProblem, nameProblem, normalizeName, passwordProblem } from "../utils/accountRules.js";
+import { emailProblem, nameProblem, normalizeName, normalizePhone, passwordProblem, phoneProblem } from "../utils/accountRules.js";
 
 const check = (name) => nameProblem(normalizeName(name));
 
@@ -49,6 +49,13 @@ describe("account rules", () => {
     }
     // Other fields of the wrong type don't break the check
     assert.equal(passwordProblem("film-night-42", { name: 5, email: {} }), null);
+  });
+
+  it("tidies phone numbers and accepts 7 to 15 digits, optionally after +", () => {
+    assert.equal(normalizePhone(" +20 100-123 4567 "), "+201001234567");
+    assert.equal(normalizePhone("(010) 012.34567"), "01001234567");
+    for (const phone of ["+201001234567", "01001234567", "5551234"]) assert.equal(phoneProblem(phone), null, phone);
+    for (const phone of ["12345", "+1234567890123456", "call1234567", "++201001234567"]) assert.notEqual(phoneProblem(phone), null, phone);
   });
 
   it("refuses .invalid emails, which guests use", () => {

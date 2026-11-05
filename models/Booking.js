@@ -73,6 +73,13 @@ const bookingSchema = new mongoose.Schema(
           'Seats must be a non-empty array of seat codes like A1, B12',
       },
     },
+    // Who to contact about the booking: a guest's phone; empty for accounts
+    // that never gave one
+    customerPhone: {
+      type: String,
+      trim: true,
+      maxlength: [16, 'Phone cannot exceed 16 characters'],
+    },
     totalPrice: {
       type: Number,
       required: [true, 'Total price is required'],

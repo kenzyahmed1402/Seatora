@@ -77,6 +77,14 @@ export const nameProblem = (name) => {
   return null;
 };
 
+// A phone number as people type it: spaces, dashes, dots and brackets go,
+// a leading + stays ("+20 100-123 4567" becomes "+201001234567")
+export const normalizePhone = (value) => value.trim().replace(/[\s().-]/g, "");
+
+// 7 to 15 digits (the international maximum), optionally after a +
+export const phoneProblem = (phone) =>
+  /^\+?\d{7,15}$/.test(phone) ? null : "phone must be a phone number of 7 to 15 digits, optionally starting with +";
+
 // .invalid can never receive mail (RFC 2606). Guest accounts use
 // @guest.invalid, so nobody can sign up with an address that looks like one.
 export const emailProblem = (email) =>

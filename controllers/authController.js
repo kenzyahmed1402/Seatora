@@ -55,10 +55,11 @@ export const login = catchAsync(async (req, res) => {
   await logIn(req, res, user, 200);
 });
 
-// POST /auth/guest: continue without typing anything. Creates a guest account
-// and logs it in; see services/guestService.js.
+// POST /auth/guest { name, email, phone }: continue without an account, with
+// the details the booking is for. Creates a guest account and logs it in;
+// see services/guestService.js.
 export const continueAsGuest = catchAsync(async (req, res) => {
-  await logIn(req, res, await createGuest(), 201);
+  await logIn(req, res, await createGuest(req.body), 201);
 });
 
 // POST /auth/upgrade { name, email, password }: turns the logged-in guest

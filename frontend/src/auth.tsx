@@ -8,14 +8,16 @@ type Auth = {
   user: User | null | undefined;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
-  continueAsGuest: () => Promise<void>;
+  // A guest gives the name, email and phone the booking is for
+  continueAsGuest: (name: string, email: string, phone: string) => Promise<void>;
   // Turns the guest account into a normal one, keeping its bookings
   upgrade: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   // For actions that need an account (book, confirm, pay, cancel): resolves
   // with the user, asking a visitor to log in, register or continue as a
-  // guest first; null if they close the dialog
-  requireUser: (reason?: string) => Promise<User | null>;
+  // guest first; null if they close the dialog. `booking`: the dialog opens
+  // on the guest details, since a new booking is what guests come for.
+  requireUser: (reason?: string, options?: { booking?: boolean }) => Promise<User | null>;
 };
 
 const AuthContext = createContext<Auth | null>(null);
@@ -23,6 +25,7 @@ const AuthContext = createContext<Auth | null>(null);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [dialogReason, setDialogReason] = useState<string | null>(null);
+  const [dialogForBooking, setDialogForBooking] = useState(false);
   const waiting = useRef<((user: User | null) => void) | null>(null);
 
   // Is the browser's session cookie still valid?
@@ -60,9 +63,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [loggedIn]
   );
 
-  const continueAsGuest = useCallback(async () => {
-    loggedIn((await api<{ user: User }>("POST", "/auth/guest")).user);
-  }, [loggedIn]);
+  const continueAsGuest = useCallback(
+    async (name: string, email: string, phone: string) => {
+      loggedIn((await api<{ user: User }>("POST", "/auth/guest", { name, email, phone })).user);
+    },
+    [loggedIn]
+  );
 
   const upgrade = useCallback(async (name: string, email: string, password: string) => {
     setUser((await api<{ user: User }>("POST", "/auth/upgrade", { name, email, password })).user);
@@ -74,10 +80,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const requireUser = useCallback(
-    (reason = "Log in to continue") => {
+    (reason = "Log in to continue", { booking = false }: { booking?: boolean } = {}) => {
       if (user) return Promise.resolve(user);
       waiting.current?.(null);
       setDialogReason(reason);
+      setDialogForBooking(booking);
       return new Promise<User | null>((resolve) => {
         waiting.current = resolve;
       });
@@ -88,7 +95,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   return (
     <AuthContext.Provider value={{ user, login, register, continueAsGuest, upgrade, logout, requireUser }}>
       {children}
-      {dialogReason !== null && <AuthDialog reason={dialogReason} onClose={() => finish(null)} />}
+      {dialogReason !== null && (
+        <AuthDialog reason={dialogReason} initialTab={dialogForBooking ? "guest" : "login"} onClose={() => finish(null)} />
+      )}
     </AuthContext.Provider>
   );
 };

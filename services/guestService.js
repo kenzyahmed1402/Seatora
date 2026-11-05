@@ -5,12 +5,15 @@ import AppError from "../utils/AppError.js";
 // Days an unused guest account is kept
 export const GUEST_DAYS = 7;
 
-// A new guest account. Its email and password are random and never shown:
+// A new guest account with the guest's name, contact email and phone (see
+// validateGuest). Its login email and password are random and never shown:
 // the guest is logged in only through the session cookie. The .invalid
 // domain can never receive mail.
-export const createGuest = () =>
+export const createGuest = ({ name, email, phone }) =>
   User.create({
-    name: "Guest",
+    name,
+    contactEmail: email,
+    phone,
     email: `guest-${randomUUID()}@guest.invalid`,
     password: randomBytes(32).toString("hex"),
     isGuest: true,

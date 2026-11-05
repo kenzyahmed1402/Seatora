@@ -4,7 +4,9 @@ import {
   emailProblem,
   nameProblem,
   normalizeName,
+  normalizePhone,
   passwordProblem,
+  phoneProblem,
 } from '../utils/accountRules.js';
 
 // For new accounts (register, and a guest's upgrade). The name, email and
@@ -30,5 +32,14 @@ const loginSchema = {
   password: { required: true, type: 'string', maxLength: 1024 },
 };
 
+// Continuing as a guest: who the booking is for. The email is for contact
+// only, never a login, so it can't clash with an existing account.
+const guestSchema = {
+  name: registerSchema.name,
+  email: registerSchema.email,
+  phone: { required: true, type: 'string', normalize: normalizePhone, maxLength: 16, check: phoneProblem },
+};
+
 export const validateRegister = validateRequest(registerSchema);
+export const validateGuest = validateRequest(guestSchema);
 export const validateLogin = validateRequest(loginSchema);
