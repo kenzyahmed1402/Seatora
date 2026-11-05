@@ -25,12 +25,13 @@ import type { Booking, SeatMap, Showtime } from "../types";
 import { CinemaHall } from "../components/CinemaHall";
 import { Poster } from "../components/Poster";
 
-const MAX_SEATS = 10;
+import { MAX_SEATS } from "../components/TimeChip";
 
 // One showtime: pick seats in the 3D hall and hold them. The price is
 // shown from the showtime, but the server works out the real total when it
 // holds the seats.
-export const ShowtimePage = ({ id }: { id?: string }) => {
+// `seats`: how many seats the customer asked for on a time chip (?seats=N)
+export const ShowtimePage = ({ id, seats }: { id?: string; seats?: string }) => {
   const { requireUser } = useAuth();
   const [showtime, setShowtime] = useState<Showtime | null>(null);
   const [map, setMap] = useState<SeatMap | null>(null);
@@ -59,12 +60,14 @@ export const ShowtimePage = ({ id }: { id?: string }) => {
       .then(([data, seatMap]) => {
         setShowtime(data.showtime);
         setMap(seatMap);
-        const n = Math.min(2, seatMap.available);
+        // The count asked for on the time chip, else 2, within what's possible
+        const wanted = Math.max(Number.parseInt(seats ?? "", 10) || 2, 1);
+        const n = Math.min(wanted, MAX_SEATS, seatMap.available);
         setCount(Math.max(n, 1));
         suggest(seatMap, n);
       })
       .catch((err) => setLoadError(err instanceof ApiError && err.status === 404 ? "This showtime doesn't exist." : errorMessage(err)));
-  }, [id, loadSeats]);
+  }, [id, seats, loadSeats]);
 
   const taken = useMemo(() => new Set(map?.taken ?? []), [map]);
   const started = showtime ? new Date(showtime.startTime).getTime() <= Date.now() : false;

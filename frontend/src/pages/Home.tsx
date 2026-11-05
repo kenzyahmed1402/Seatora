@@ -14,9 +14,10 @@ import {
 } from "lucide-react";
 import { api, errorMessage } from "../api";
 import type { Movie, Showtime } from "../types";
-import { cinemaArea, dayLabel, localDay, money, runtime, time } from "../format";
-import { go, href } from "../route";
+import { cinemaArea, dayLabel, localDay, runtime } from "../format";
+import { go } from "../route";
 import { Poster } from "../components/Poster";
+import { TimeChip } from "../components/TimeChip";
 import { CinemaHall, type SeatState } from "../components/CinemaHall";
 
 const HEADLINE = ["Your", "seat", "is", "waiting."];
@@ -307,17 +308,14 @@ export const Home = () => {
                   {movie.description && <p className="description">{movie.description}</p>}
                   <div className="times">
                     {times.map((showtime) => (
-                      <a key={showtime._id} className="time-chip" href={href("showtime", showtime._id)}>
-                        <strong>{time(showtime.startTime)}</strong>
-                        <span>
-                          <MapPin size={12} aria-hidden="true" />
-                          {cinemaArea(showtime.screen.cinema.name)}
-                        </span>
-                        <span>
-                          <Armchair size={12} aria-hidden="true" />
-                          {showtime.availableSeats} left · {money(showtime.price)}
-                        </span>
-                      </a>
+                      <TimeChip
+                        key={showtime._id}
+                        id={showtime._id}
+                        startTime={showtime.startTime}
+                        cinema={showtime.screen.cinema.name}
+                        price={showtime.price}
+                        seatsLeft={showtime.availableSeats}
+                      />
                     ))}
                   </div>
                 </div>

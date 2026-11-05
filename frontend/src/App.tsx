@@ -92,7 +92,9 @@ export const App = () => {
       <main id="main" className="wrap" ref={main} tabIndex={-1}>
         {route.page === "home" && <Home />}
         {route.page === "chat" && <Chat initial={route.query.get("q") ?? undefined} />}
-        {route.page === "showtime" && <ShowtimePage key={route.param} id={route.param} />}
+        {route.page === "showtime" && (
+          <ShowtimePage key={route.param} id={route.param} seats={route.query.get("seats") ?? undefined} />
+        )}
         {route.page === "booking" && <BookingPage key={route.param} id={route.param} />}
         {route.page === "bookings" && user && <BookingsPage key={user._id} />}
       </main>

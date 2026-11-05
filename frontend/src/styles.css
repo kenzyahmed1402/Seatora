@@ -905,6 +905,55 @@ nav a[aria-current="page"]::after {
   transition: border-color 0.25s var(--ease);
 }
 
+/* the chip's summary is a button that opens the seat count */
+.time-chip-main {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.time-chip-main:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.time-chip.open {
+  border-color: var(--accent);
+}
+
+.time-chip-seats {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.time-chip-seats p {
+  margin: 0;
+}
+
+.time-chip-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.time-chip-count output {
+  min-width: 2ch;
+  color: var(--text);
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
 .time-chip span {
   display: inline-flex;
   align-items: center;
