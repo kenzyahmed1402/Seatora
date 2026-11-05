@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, X } from "lucide-react";
 import { errorMessage } from "../api";
 import { useAuth } from "../auth";
+import { href } from "../route";
 
 export type Tab = "guest" | "login" | "register";
 
@@ -84,7 +85,7 @@ export const AuthDialog = ({ reason, initialTab = "login", onClose }: { reason: 
               required
               maxLength={24}
               autoComplete="tel"
-              placeholder="+20 100 123 4567"
+              placeholder="+1 (555) 123-4567"
             />
           </label>
         )}
@@ -105,7 +106,14 @@ export const AuthDialog = ({ reason, initialTab = "login", onClose }: { reason: 
             />
           </label>
         )}
-        {tab === "guest" && <p className="hint">Your ticket is booked in this name · save it as an account later</p>}
+        {tab === "guest" && (
+          <p className="hint">
+            Used only for this booking, never shared · demo: please use made-up details ·{" "}
+            <a href={href("privacy")} target="_blank" rel="noopener">
+              Privacy
+            </a>
+          </p>
+        )}
         {error && (
           <p className="error" role="alert">
             {error}

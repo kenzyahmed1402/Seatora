@@ -3,7 +3,7 @@ import { reloadIfOutdated } from "./version";
 
 // Pages live after the # (e.g. /#/showtime/<id>), so the server only ever
 // serves one page and no page address can clash with an API path.
-export type Page = "home" | "chat" | "showtime" | "booking" | "bookings";
+export type Page = "home" | "chat" | "showtime" | "booking" | "bookings" | "privacy";
 
 export type Route = {
   page: Page;
@@ -12,7 +12,7 @@ export type Route = {
   query: URLSearchParams;
 };
 
-const PAGES: Page[] = ["home", "chat", "showtime", "booking", "bookings"];
+const PAGES: Page[] = ["home", "chat", "showtime", "booking", "bookings", "privacy"];
 
 const parse = (): Route => {
   const [path, search = ""] = window.location.hash.replace(/^#\/?/, "").split("?");

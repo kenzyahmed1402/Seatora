@@ -1011,6 +1011,31 @@ nav a[aria-current="page"]::after {
   font-weight: 600;
 }
 
+/* ---------- privacy ---------- */
+
+.privacy-sections {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+}
+
+.privacy-section {
+  padding: 20px 22px;
+}
+
+.privacy-section h2 {
+  margin-bottom: 10px;
+  font-size: 1.15rem;
+}
+
+.privacy-section ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--body);
+}
+
 /* ---------- how it works ---------- */
 
 .steps {

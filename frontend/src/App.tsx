@@ -7,6 +7,7 @@ import { Chat } from "./pages/Chat";
 import { ShowtimePage } from "./pages/Showtime";
 import { BookingPage } from "./pages/Booking";
 import { BookingsPage } from "./pages/Bookings";
+import { PrivacyPage } from "./pages/Privacy";
 import { Logo } from "./components/Logo";
 
 const NAV: { page: Page; label: string; icon: LucideIcon }[] = [
@@ -97,10 +98,13 @@ export const App = () => {
         )}
         {route.page === "booking" && <BookingPage key={route.param} id={route.param} />}
         {route.page === "bookings" && user && <BookingsPage key={user._id} />}
+        {route.page === "privacy" && <PrivacyPage />}
       </main>
 
       <footer className="footer">
-        <p className="wrap muted">Fictional movies and cinemas · PayPal Sandbox, no real money is charged</p>
+        <p className="wrap muted">
+          Fictional movies and cinemas · PayPal Sandbox, no real money is charged · <a href={href("privacy")}>Privacy</a>
+        </p>
       </footer>
     </div>
   );
