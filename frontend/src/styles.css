@@ -485,6 +485,8 @@ nav a[aria-current="page"]::after {
 .hall-camera {
   position: relative;
   transform-style: preserve-3d;
+  /* its own layer, so Safari doesn't repaint the scene while it moves */
+  will-change: transform;
   /* narrower than the column: perspective widens the near rows */
   margin-inline: 11%;
   transform-origin: 50% 0%;
@@ -499,7 +501,10 @@ nav a[aria-current="page"]::after {
   bottom: 100%;
   height: 46px;
   transform-origin: 50% 100%;
-  transform: rotateX(-52deg);
+  /* lifted 2px off the floor's plane: where two 3D planes meet, Safari keeps
+     re-sorting them, and the screen flickers */
+  transform: translateZ(2px) rotateX(-52deg);
+  backface-visibility: hidden;
   border-radius: 50% 50% 8px 8px / 16px 16px 8px 8px;
   background: linear-gradient(180deg, rgba(239, 232, 218, 0.95), rgba(239, 232, 218, 0.35));
 }
@@ -610,15 +615,21 @@ nav a[aria-current="page"]::after {
 /* the camera glides in from further back and higher up, then settles */
 @keyframes glide {
   from {
-    opacity: 0;
     transform: translate3d(0, -4%, -420px) rotateX(64deg);
   }
-  35% {
-    opacity: 1;
+  to {
+    transform: rotateX(46deg);
+  }
+}
+
+/* The fade is on the stage, never on the 3D camera: a see-through 3D scene
+   has to be flattened, and Safari flickers while it switches back */
+@keyframes hallFade {
+  from {
+    opacity: 0;
   }
   to {
     opacity: 1;
-    transform: rotateX(46deg);
   }
 }
 
@@ -627,6 +638,10 @@ nav a[aria-current="page"]::after {
      so the seat picker can tilt it */
   .hall-camera {
     animation: glide 2.8s var(--ease-out) 0.1s backwards;
+  }
+
+  .hall-stage {
+    animation: hallFade 1s var(--ease-out) 0.1s backwards;
   }
 
   .hero .rise {
