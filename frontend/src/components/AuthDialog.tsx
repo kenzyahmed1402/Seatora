@@ -8,6 +8,13 @@ export type Tab = "guest" | "login" | "register";
 
 const TAB_NAMES: Record<Tab, string> = { guest: "Guest", login: "Log in", register: "Create account" };
 
+// The privacy note under each tab's form, with a link to the Privacy page
+const PRIVACY_NOTES: Record<Tab, string> = {
+  guest: "Used only for this booking, never shared · demo: please use made-up details",
+  register: "Used only for your bookings, never shared · demo: please use made-up details",
+  login: "Your details are never shared",
+};
+
 // Continue as a guest (with the name, email and phone the booking is for),
 // log in or create an account, shown only when an action needs an account
 export const AuthDialog = ({ reason, initialTab = "login", onClose }: { reason: string; initialTab?: Tab; onClose: () => void }) => {
@@ -106,14 +113,12 @@ export const AuthDialog = ({ reason, initialTab = "login", onClose }: { reason: 
             />
           </label>
         )}
-        {tab === "guest" && (
-          <p className="hint">
-            Used only for this booking, never shared · demo: please use made-up details ·{" "}
-            <a href={href("privacy")} target="_blank" rel="noopener">
-              Privacy
-            </a>
-          </p>
-        )}
+        <p className="hint">
+          {PRIVACY_NOTES[tab]} ·{" "}
+          <a href={href("privacy")} target="_blank" rel="noopener">
+            Privacy
+          </a>
+        </p>
         {error && (
           <p className="error" role="alert">
             {error}
