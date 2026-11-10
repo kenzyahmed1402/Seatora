@@ -1,17 +1,34 @@
-# Cinema Booking Backend
+# Seatora
 
-A REST API for running a cinema booking system, built with **Node.js**, **Express 5** and **MongoDB (Mongoose)**.
+**Book cinema seats by chatting with an AI assistant, then pay with PayPal, without leaving the conversation.**
 
-It handles the full chain from venue setup to ticket sales: admins create **cinemas**, add **screens** with seat layouts, add **movies** and schedule **showtimes** (a movie on a screen at a given time); customers register, log in and take **bookings** for specific seats. The server enforces the rules: no double-booking, seats must exist on the screen, prices are calculated by the server, showtimes can't overlap, and customers only see and cancel their own bookings.
+Live demo: **<https://seatora-web.vercel.app>** · PayPal **Sandbox**: no real money moves · all movies and cinemas are fictional.
+
+![The Seatora home page: "Your seat is waiting." beside a 3D cinema hall](docs/screenshots/home.png)
+
+Seatora is a cinema-booking web app with an AI booking agent. A customer types something like *"a comedy this weekend at Downtown"*. The agent searches the real schedule straight away and the chat shows the matching showtimes as time chips. The customer taps one to pick seats in a 3D hall, or asks the agent to book, which shows a booking card with the seats and a server-calculated total. One click on **Confirm** holds the seats, the PayPal button appears on the card, and once the server has verified the payment the card turns into the ticket with a QR code. Cancelling works the same way: the agent shows the refund the policy allows, the customer confirms, and the refund goes back through PayPal.
+
+**Core rule:** the AI helps the customer decide; the backend owns seats, prices, booking states, payment verification and refunds; PayPal moves the money. Every action that holds seats, charges or refunds needs the customer's click.
+
+| Ask the assistant | Book on the card |
+| --- | --- |
+| ![The assistant's reply with time chips for two comedy showtimes](docs/screenshots/assistant-showtimes.png) | ![A booking card with seats C5 and C6 in a 3D hall and a Confirm button](docs/screenshots/assistant-card.png) |
+| **Pick seats yourself** | **Or tap a time** |
+| ![The 3D seat picker with the two best seats chosen](docs/screenshots/seat-picker.png) | ![A time chip asking how many seats before the seat picker](docs/screenshots/whats-on.png) |
 
 ---
 
 ## Table of Contents
 
+- [How it works](#how-it-works)
+- [The AI booking agent](#the-ai-booking-agent)
+- [PayPal integration](#paypal-integration)
+- [Architecture](#architecture)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
+- [Deploying (Vercel + MongoDB Atlas)](#deploying-vercel--mongodb-atlas)
 - [Environment Variables](#environment-variables)
 - [Authentication & Roles](#authentication--roles)
 - [Data Model](#data-model)
@@ -22,11 +39,62 @@ It handles the full chain from venue setup to ticket sales: admins create **cine
 - [Error Handling](#error-handling)
 - [Security](#security)
 - [Testing](#testing)
+- [Project history](#project-history)
+- [Credits](#credits)
 
 ---
 
+## How it works
+
+1. **Ask.** "A comedy this weekend at Downtown for two." The agent searches the schedule (dates are worked out in cinema time) and the chat lists the results as time chips.
+2. **Choose.** Tap a chip, say how many seats, and the 3D seat picker opens with the best seats chosen; or ask the agent to book, and it checks the seats and shows a booking card.
+3. **Confirm.** One click holds the seats for 10 minutes. Visitors continue as a guest with their name, email and phone, or log in.
+4. **Pay.** The PayPal button appears on the card. The server creates the order from the booking (the browser and the AI never send an amount), captures it, and checks status, amount, currency and payee before confirming.
+5. **Ticket.** The card turns into the ticket: reference, seats, QR code, and a full ticket page to print or save.
+6. **Cancel.** Ask the agent or use My bookings: the refund the policy allows is shown first (100% up to 24 hours before, 50% up to 2 hours before), the customer confirms, and PayPal refunds it.
+
+## The AI booking agent
+
+The agent (`services/agentChat.js`) is a tool-calling loop: the model chooses tools, the server runs them for the logged-in customer, and the model answers from their results.
+
+- **Tools, from a fixed allowlist:** `searchMovies`, `searchShowtimes`, `getAvailableSeats`, `getBookingQuote`, `getMyBookings`, `getPaymentStatus`, `getCancellationQuote`, and two **propose** tools, `proposeBooking` and `proposeCancellation`, which only create a card. Nothing is held, charged or refunded until the customer clicks, and the server checks seats, price and refund again then.
+- **Models:** Google **Gemini** (`gemini-3.5-flash`, then `gemini-3.8-flash`) with function calling, and **Groq** (`openai/gpt-oss-120b`, then `openai/gpt-oss-20b`) as a fallback. Failures are classified (rate limit, overloaded, too slow, unknown model, refused key, request too large); a message moves to the next model, and models that are rate limited or overloaded are skipped for a while.
+- **Guards against model mistakes:** a reply that claims showtimes without searching triggers a required search; a reply that draws a fake card or button is replaced; IDs never reach the customer; showtime lists, cards and prices come only from tool results, never from the model's text.
+- **Limits:** 6 tool calls and 90 seconds per message, per-user and per-visitor message limits, and a daily cap on model calls.
+
+## PayPal integration
+
+PayPal is the payment layer of every booking (`services/paypalService.js`, `services/captureService.js`, `services/refundService.js`):
+
+- **Orders v2:** the server creates the order from the booking's total, in integer cents; the browser never sends an amount.
+- **JS SDK buttons** on the chat's booking card and on the booking page, loaded early so they appear right after Confirm.
+- **Verified capture:** the server captures and checks `COMPLETED`, amount, currency, payee and booking ownership before confirming. A payment that arrives after the hold ran out is refunded automatically and flagged for review.
+- **Refunds** through the Captures refund API, for exactly the amount the customer confirmed.
+- **Webhooks** (`PAYMENT.CAPTURE.COMPLETED`, `.DENIED`, `.REFUNDED`, `.REVERSED`), verified with PayPal's signature-verification API and idempotent, so duplicates and late deliveries change nothing twice.
+- **Sandbox only:** the server refuses to start unless `PAYPAL_ENV=sandbox`.
+
+## Architecture
+
+```
+Browser (React + TypeScript, served by Express)
+  ├─ Chat ─────────── POST /agent/chat ──────────► Agent: Gemini → Gemini → Groq → Groq
+  │                    (reply + cards + showtimes)    tool allowlist, guards, failover
+  │                    POST /agent/proposals/:id/confirm   (holds seats or cancels)
+  ├─ Time chips / seat picker ── POST /bookings     (hold seats for 10 minutes)
+  ├─ PayPal button on the card ─ POST /payments/orders → PayPal Sandbox (customer approves)
+  │                              POST /payments/capture  (server captures and verifies)
+  └─ My bookings ──── GET /bookings/:id/cancellation-quote, POST /bookings/:id/cancel (PayPal refund)
+PayPal ── webhooks ──► POST /payments/webhook (signature verified, idempotent)
+Everything ──────────► MongoDB Atlas
+```
+
 ## Features
 
+- **AI booking agent** with tool calling, showtime chips, booking and cancellation cards, and failover from Gemini to Groq
+- **PayPal checkout in the chat:** Orders v2, JS SDK buttons on the booking card, verified capture, refunds and verified webhooks (Sandbox)
+- **Web app:** a dark cinema design with a CSS 3D hall, a seat picker with "Best seats", time chips that ask how many seats, a ticket with a QR code, My bookings with cancellations and refunds, a Privacy page
+- **Guests:** book without an account by giving a name, email and phone; save it as an account later
+- **A demo schedule that renews itself** for the coming week
 - **Accounts and roles:** register/login with JWT, `CUSTOMER` and `ADMIN` roles, passwords hashed with bcrypt
 - **Admin management** of cinemas, screens, movies and showtimes
 - **Seat booking** with protection against double-booking (atomic `findOneAndUpdate` with `$nin` / `$addToSet`)
@@ -51,6 +119,10 @@ It handles the full chain from venue setup to ticket sales: admins create **cine
 | ---------- | ------------------------------------------------- |
 | Runtime    | Node.js (ES modules)                              |
 | Framework  | Express 5                                         |
+| Web app    | React 19, TypeScript, Vite, Lucide icons          |
+| AI         | Google Gemini (`@google/genai`, function calling), Groq (OpenAI-style API through `fetch`) |
+| Payments   | PayPal REST APIs (Orders v2, Captures, Refunds, Webhooks) and JS SDK, Sandbox |
+| Hosting    | Vercel, MongoDB Atlas                             |
 | Database   | MongoDB                                           |
 | ODM        | Mongoose 9                                        |
 | Auth       | jsonwebtoken, bcryptjs                            |
@@ -133,8 +205,8 @@ Each request passes through: **helmet → CORS → router → `protect` / `restr
 ### Installation
 
 ```bash
-git clone https://github.com/kenzyahmed1402/cinema-booking-backend.git
-cd cinema-booking-backend
+git clone https://github.com/kenzyahmed1402/Seatora.git
+cd Seatora
 npm install
 ```
 
@@ -776,7 +848,20 @@ Common status codes:
 npm test
 ```
 
-137 automated tests (Node's built-in test runner + `supertest`) cover bookings, seat rules, showtime overlaps, screen layouts, validation, errors, authentication and roles, delete rules, pagination and filters, and security. Each test file runs against its own in-memory MongoDB (`mongodb-memory-server`), so tests never touch your real database. The first run downloads a MongoDB binary, which is cached afterwards.
+261 automated tests in 34 files (Node's built-in test runner + `supertest`) cover bookings, seat rules, showtime overlaps, screen layouts, validation, errors, authentication, guests and roles, PayPal orders, captures, refunds and webhooks (against a fake PayPal), the assistant's tools, cards, failover and guards (against a fake model), rate limits and security. Each test file that needs a database runs against its own in-memory MongoDB (`mongodb-memory-server`), so tests never touch your real database. GitHub Actions runs the tests, a web app build and a secret scan (gitleaks) on every push.
+
+## Project history
+
+| Version | When | What |
+| --- | --- | --- |
+| [v1.0.0](https://github.com/kenzyahmed1402/Seatora/releases/tag/v1.0.0) | Aug 2026 | The cinema booking REST API: cinemas, screens, movies, showtimes and seat bookings with server-side rules |
+| v2.0.0 | Oct–Nov 2026 | Seatora: authentication and security hardening, PayPal payments, refunds and webhooks, the AI booking agent with failover, and the web app |
+
+Every change since v1.0.0: <https://github.com/kenzyahmed1402/Seatora/compare/v1.0.0...develop>. See [CHANGELOG.md](CHANGELOG.md) for details.
+
+## Credits
+
+All movies, cinemas, posters and the logo are fictional and made for this project. Fonts and libraries used under their open licences: [Playfair Display](https://fonts.google.com/specimen/Playfair+Display) and [Inter](https://rsms.me/inter/) (SIL Open Font License, via Fontsource), [Lucide](https://lucide.dev) icons (ISC), [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT). PayPal's buttons are PayPal's own.
 
 ## License
 
