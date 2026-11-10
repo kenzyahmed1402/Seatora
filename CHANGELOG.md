@@ -29,7 +29,7 @@ The REST API becomes **Seatora**: a cinema-booking web app with an AI booking ag
 ### AI booking agent
 - A tool-calling agent with an allowlist of read tools and two propose tools that only create a booking or cancellation card; every card is confirmed by the customer's click and checked again by the server.
 - Google Gemini with failover to a second Gemini model and to Groq, failure classification, short retries and cooling for rate-limited or overloaded models.
-- Showtime results shown as tappable time chips; cards and prices only from tool results; guards against replies that skip a search, draw fake cards or show IDs.
+- Showtime results shown as tappable time chips; cards and prices only from tool results; guards against replies that skip a search, write a tool call out as text, draw fake cards or show IDs.
 - Compact requests: cinema-time dates, short tool results, earlier searches shortened.
 
 ### Web app
@@ -38,6 +38,7 @@ The REST API becomes **Seatora**: a cinema-booking web app with an AI booking ag
 - The assistant page with time chips and booking cards; PayPal on the card, which turns into the ticket once paid.
 - Checkout with a hold countdown; a ticket with a QR code, print and image download; My bookings with cancellations and refunds.
 - A Privacy page; pages left open across a deploy reload themselves.
+- A phone layout: a compact header, the chat sized to the visible screen, more room for messages while typing, and tickets that fit narrow screens.
 
 ### Operations
 - Deployment on Vercel with MongoDB Atlas; public lists cached briefly at the CDN.
