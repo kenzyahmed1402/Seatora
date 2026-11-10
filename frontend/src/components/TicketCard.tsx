@@ -33,12 +33,17 @@ export const TicketCard = ({ booking }: { booking: BookingDetail }) => {
               <MapPin size={15} aria-hidden="true" /> {showtime.screen.cinema?.name ?? "Cinema"} · Screen {showtime.screen.screenNumber}
             </li>
             {booking.customerName && (
-              <li>
+              <li className="ticket-customer-row">
                 <User size={15} aria-hidden="true" />
-                {/* older guest bookings have an unreachable .invalid address: not shown */}
-                {[booking.customerName, booking.customerEmail, booking.customerPhone]
-                  .filter((value) => value && !value.endsWith(".invalid"))
-                  .join(" · ")}
+                <span className="ticket-customer">
+                  <span>{booking.customerName}</span>
+                  {/* older guest bookings have an unreachable .invalid address: not shown */}
+                  <span>
+                    {[booking.customerEmail, booking.customerPhone]
+                      .filter((value) => value && !value.endsWith(".invalid"))
+                      .join(" · ")}
+                  </span>
+                </span>
               </li>
             )}
             <li>

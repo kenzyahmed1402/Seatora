@@ -1495,6 +1495,7 @@ nav a[aria-current="page"]::after {
 
 .ticket {
   position: relative;
+  overflow: hidden; /* the stub's notches stay inside, so the page never gets wider than a phone */
   border: 1px solid var(--line-strong);
   border-radius: 18px;
   background: var(--raised);
@@ -1550,7 +1551,29 @@ nav a[aria-current="page"]::after {
   gap: 8px;
 }
 
+/* name on one line, email and phone under it; a long email address wraps
+   instead of widening the ticket */
+.ticket-facts .ticket-customer-row {
+  align-items: flex-start;
+}
+
+.ticket-customer-row svg {
+  margin-top: 3px;
+}
+
+.ticket-customer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ticket-customer span:empty {
+  display: none;
+}
+
 .ticket-facts svg {
+  flex-shrink: 0;
   color: var(--muted);
 }
 
@@ -2664,5 +2687,14 @@ button.seat:disabled {
 
   .ticket-flip {
     animation: none !important;
+  }
+}
+
+/* the smallest phones: the three pages still fit on one line */
+@media (max-width: 359px) {
+  nav a {
+    gap: 4px;
+    padding: 10px 5px;
+    font-size: 0.82rem;
   }
 }
