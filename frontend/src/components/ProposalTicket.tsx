@@ -15,9 +15,10 @@ import { api } from "../api";
 import { money } from "../format";
 import { href } from "../route";
 import { clock, useSecondsLeft } from "../hooks";
-import type { Booking, BookingDetail, ProposalCard, SeatMap } from "../types";
+import type { Booking, BookingCard, BookingDetail, ProposalCard, SeatMap } from "../types";
 import { CinemaHall } from "./CinemaHall";
 import { PayPalButton } from "./PayPalButton";
+import { loadPayPal } from "../paypal";
 import { Poster } from "./Poster";
 import { TicketCard } from "./TicketCard";
 
@@ -51,15 +52,21 @@ type Props = {
 const cents = (value: number) => money(value / 100);
 
 // The hall with the card's seats picked, from the showtime's live seat map
-const TicketHall = ({ showtime, seats }: { showtime: string; seats: string[] }) => {
-  const [map, setMap] = useState<SeatMap | null>(null);
+// The card brings the hall as it was when the card was made, so it draws at
+// once; older cards without it ask the server, with the space kept free so
+// nothing jumps when it arrives.
+const TicketHall = ({ showtime, seats, hall }: { showtime: string; seats: string[]; hall?: BookingCard["hall"] }) => {
+  const [fetched, setFetched] = useState<SeatMap | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
+    if (hall) return;
     api<{ seatMap: SeatMap }>("GET", `/showTimes/${showtime}/seats`)
-      .then((data) => setMap(data.seatMap))
-      .catch(() => setMap(null));
-  }, [showtime]);
+      .then((data) => setFetched(data.seatMap))
+      .catch(() => setFailed(true));
+  }, [showtime, hall]);
 
-  if (!map?.rows || !map.seatsPerRow) return null;
+  const map = hall ?? fetched;
+  if (!map?.rows || !map.seatsPerRow) return failed ? null : <div className="ticket-hall-space" aria-hidden="true" />;
   const picked = new Set(seats);
   const taken = new Set(map.taken);
   return (
@@ -85,6 +92,13 @@ export const ProposalTicket = ({ card, state, onConfirm, onPaid, variant, select
   const paid = useRef(onPaid);
   paid.current = onPaid;
   const handlePaid = useRef((done: Booking) => paid.current?.(card, done)).current;
+
+  // A booking card that may be paid soon: fetch PayPal's script now, so its
+  // button is ready the moment the seats are held
+  const mayPay = booking && (status === "open" || payable);
+  useEffect(() => {
+    if (mayPay) loadPayPal().catch(() => undefined);
+  }, [mayPay]);
 
   const facts = (
     <ul className="ticket-facts">
@@ -220,7 +234,7 @@ export const ProposalTicket = ({ card, state, onConfirm, onPaid, variant, select
         </div>
       </div>
 
-      {booking && status !== "expired" && <TicketHall showtime={card.showtime} seats={card.seats} />}
+      {booking && status !== "expired" && <TicketHall showtime={card.showtime} seats={card.seats} hall={card.hall} />}
       {!booking && <p className="ticket-policy muted">{card.policy}</p>}
 
       <div className="ticket-stub">

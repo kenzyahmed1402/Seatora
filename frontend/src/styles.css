@@ -1703,6 +1703,18 @@ nav a[aria-current="page"]::after {
   padding: 40px 0 8px;
 }
 
+/* A small hall inside a card doesn't play the camera glide: it's heavy in
+   a scrolling chat on a phone, and the hall is already in place */
+.hall-stage.ticket-hall,
+.hall-stage.ticket-hall .hall-camera {
+  animation: none;
+}
+
+/* Room for a card's hall while its seats load, so the card doesn't jump */
+.ticket-hall-space {
+  height: 230px;
+}
+
 .hall-stage.ticket-hall .hall-camera {
   margin-inline: 13%;
 }

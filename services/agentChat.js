@@ -299,6 +299,11 @@ const runMessage = async (entry, owner, history, message, started) => {
       // model gets a shorter version: every call resends it, and the list
       // already shows the rest.
       let response = result;
+      // The card's hall layout is for the chat only: the model doesn't need it
+      if (result.output?.card?.hall) {
+        const { hall, ...card } = result.output.card;
+        response = { output: { ...result.output, card } };
+      }
       if (call.name === "searchShowtimes" && Array.isArray(result.output)) {
         showtimes = addShowtimes(showtimes, result.output);
         response = { output: result.output.map(showtimeForModel) };

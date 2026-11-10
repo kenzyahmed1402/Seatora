@@ -232,6 +232,13 @@ export const agentTools = {
         totalCents: quote.totalCents,
         currency: quote.currency,
         expiresAt,
+        // The hall as it is now, so the card can draw it straight away
+        // (only the chat gets this, not the model: see agentChat.js)
+        hall: {
+          rows: doc.screen?.rows ?? 0,
+          seatsPerRow: doc.screen?.seatsPerRow ?? 0,
+          taken: doc.bookedSeats.filter((seat) => !seats.includes(seat)),
+        },
       };
       const proposal = await AgentProposal.create({
         ...(user ? { user: user._id } : { visitor }),

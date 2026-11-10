@@ -69,6 +69,8 @@ export type BookingCard = {
   totalCents: number;
   currency: string;
   expiresAt: string;
+  // The hall when the card was made (cards from before this have none)
+  hall?: { rows: number; seatsPerRow: number; taken: string[] };
 };
 
 export type CancellationCard = {

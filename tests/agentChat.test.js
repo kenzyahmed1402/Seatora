@@ -636,6 +636,21 @@ describe("assistant chat limits", () => {
     assert.deepEqual(res.body.data.showtimes.map((s) => s.showtime), [String(showtime._id)]);
   });
 
+  it("gives the chat the card's hall to draw at once, but not the model", async () => {
+    const { alice, showtime } = await setup();
+    await book(alice, showtime, ["A1"]);
+    scriptedModel(ask(["proposeBooking", { showtime: String(showtime._id), seats: ["C3", "C4"] }]), (request) => {
+      const result = toolResults(request)[0].output;
+      assert.equal(result.card.hall, undefined);
+      assert.deepEqual(result.card.seats, ["C3", "C4"]);
+      return say("Press Confirm on the card.");
+    });
+    const res = await send(alice, "Book C3 and C4");
+    const [card] = res.body.data.cards;
+    assert.ok(card.hall.rows > 0 && card.hall.seatsPerRow > 0);
+    assert.deepEqual(card.hall.taken, ["A1"]);
+  });
+
   it("leaves the showtime list out once the message made a card", async () => {
     const { alice, showtime } = await setup();
     scriptedModel(
