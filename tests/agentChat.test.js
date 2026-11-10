@@ -624,6 +624,62 @@ describe("assistant chat limits", () => {
     assert.equal(model.requests.length, 1);
   });
 
+  it("asks the model to make a tool call it wrote as text, searching first for a showtime's ID", async () => {
+    const { alice, showtime } = await setup();
+    scriptedModel(
+      say('The first one is Sat 13:00. Seats B5, B6. <proposeBooking showtime="" seats="B5,B6"/>'),
+      (request) => {
+        assert.match(request.contents.at(-1).parts[0].text, /you wrote proposeBooking as text/);
+        // No search ran in this message, so there is no ID yet: search first
+        assert.equal(request.requiredTool, "searchShowtimes");
+        return ask(["searchShowtimes", {}]);
+      },
+      (request) => {
+        assert.equal(request.requiredTool, undefined);
+        return ask(["proposeBooking", { showtime: String(showtime._id), seats: ["B5", "B6"] }]);
+      },
+      say("Press Confirm on the card.")
+    );
+    const res = await send(alice, "book 2 seats for the first one");
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.cards.length, 1);
+    assert.equal(res.body.data.reply, "Press Confirm on the card.");
+    const stored = (await AgentConversation.findOne({ user: alice.user._id })).contents;
+    assert.doesNotMatch(stored, /Note from the app/);
+    assert.doesNotMatch(stored, /<proposeBooking/);
+  });
+
+  it("requires the written tool itself once a search already ran", async () => {
+    const { alice, showtime } = await setup();
+    scriptedModel(
+      ask(["searchShowtimes", {}]),
+      say(`proposeBooking(showtime="${showtime._id}", seats=["A1"])`),
+      (request) => {
+        assert.equal(request.requiredTool, "proposeBooking");
+        return ask(["proposeBooking", { showtime: String(showtime._id), seats: ["A1"] }]);
+      },
+      say("Here is the card for A1.")
+    );
+    const res = await send(alice, "Book A1 for the first showtime");
+    assert.equal(res.body.data.cards.length, 1);
+  });
+
+  it("never shows tool markup: replaced when no card was made, removed when one was", async () => {
+    const { alice, showtime } = await setup();
+    scriptedModel(say("<proposeBooking seats=\"A1\"/>"), say("<proposeBooking seats=\"A1\"/>"));
+    let res = await send(alice, "Book A1");
+    assert.equal(model.requests.length, 2);
+    assert.match(res.body.data.reply, /couldn't prepare the booking card/);
+
+    scriptedModel(
+      ask(["proposeBooking", { showtime: String(showtime._id), seats: ["A2"] }]),
+      say('Here it is. <proposeBooking showtime="x" seats="A2"/>')
+    );
+    res = await send(alice, "Book A2");
+    assert.equal(res.body.data.cards.length, 1);
+    assert.equal(res.body.data.reply, "Here it is.");
+  });
+
   it("lists the showtimes of all the message's searches, and an empty search doesn't wipe them out", async () => {
     const { alice, showtime } = await setup();
     scriptedModel(

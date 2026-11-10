@@ -47,7 +47,25 @@ const FAKE_BUTTON = new RegExp(
   ].join("|"),
   "i"
 );
-export const drawsCard = (reply) => FAKE_BUTTON.test(reply);
+// A reply that writes a tool call out as text ("<proposeBooking showtime=…/>",
+// "proposeBooking(…)") instead of making it: nothing ran, so there is no card
+// or list. The model is asked once to make the call; markup that still comes
+// through is never shown.
+const TOOL_NAMES = toolDeclarations.map((tool) => tool.name).join("|");
+const TOOL_AS_TEXT = new RegExp(String.raw`<\/?\s*(${TOOL_NAMES})\b[^>]*>|\b(${TOOL_NAMES})\s*\(`, "i");
+const TOOL_TAGS = new RegExp(String.raw`<\/?\s*(?:${TOOL_NAMES})\b[^>]*>`, "gi");
+export const toolWrittenAsText = (reply) => {
+  const match = TOOL_AS_TEXT.exec(reply);
+  const said = match && (match[1] ?? match[2]).toLowerCase();
+  return toolDeclarations.find((tool) => tool.name.toLowerCase() === said)?.name ?? null;
+};
+const needsShowtime = (name) =>
+  Boolean(toolDeclarations.find((tool) => tool.name === name)?.parametersJsonSchema.properties.showtime);
+const toolReminder = (name) =>
+  `(Note from the app, not the customer: you wrote ${name} as text, so nothing ran and the customer sees ` +
+  `no card or list. Make the real ${name} tool call now, with real values. A showtime's ID comes from searchShowtimes.)`;
+
+export const drawsCard = (reply) => FAKE_BUTTON.test(reply) || TOOL_AS_TEXT.test(reply);
 const NO_CARD =
   "Sorry, I couldn't prepare the booking card. Please ask me again, or pick your seats on the showtime page.";
 
@@ -251,8 +269,9 @@ const runMessage = async (entry, owner, history, message, started) => {
   let showtimes = [];
   let toolCalls = 0;
   const tools = [];
-  // Where the search reminder went, if it was needed
+  // Where the reminder went, if one was needed, and the tool it asks for
   let reminder = -1;
+  let mustCall;
   const finish = (text) => {
     const reply = withoutIds(text) || text;
     if (reminder >= 0) contents.splice(reminder, 2);
@@ -264,17 +283,28 @@ const runMessage = async (entry, owner, history, message, started) => {
     if (toolCalls > 0 && Date.now() - started > TURN_BUDGET_MS) {
       return finish(TOO_SLOW);
     }
-    // Right after the search reminder, the model must call searchShowtimes:
-    // a reminder alone can be ignored
-    const required = reminder >= 0 && !tools.includes("searchShowtimes") ? "searchShowtimes" : undefined;
+    // Right after a reminder, the model must call the tool it asks for: a
+    // reminder alone can be ignored
+    const required = mustCall && !tools.includes(mustCall) ? mustCall : undefined;
     const response = await askModel(entry, contents, Boolean(owner.user), started, required);
     const calls = response.functionCalls ?? [];
 
     if (calls.length === 0) {
       const reply = response.text?.trim() || "Sorry, I don't have an answer for that.";
       const searched = tools.includes("searchShowtimes") || tools.includes("searchMovies");
+      const written = cards.length === 0 && toolWrittenAsText(reply);
+      if (reminder < 0 && written) {
+        console.error("Assistant reply wrote a tool call as text; asked to make it");
+        // A tool that needs a showtime's ID needs a search first: earlier
+        // messages' results don't keep the IDs (see compactHistory)
+        mustCall = needsShowtime(written) && !tools.includes("searchShowtimes") ? "searchShowtimes" : written;
+        reminder = contents.length;
+        contents.push({ role: "model", parts: [{ text: reply }], by }, { role: "user", parts: [{ text: toolReminder(written) }] });
+        continue;
+      }
       if (reminder < 0 && !searched && cards.length === 0 && claimsShowtimes(reply)) {
         console.error("Assistant reply claimed showtimes without searching; asked to search");
+        mustCall = "searchShowtimes";
         reminder = contents.length;
         contents.push({ role: "model", parts: [{ text: reply }], by }, { role: "user", parts: [{ text: SEARCH_REMINDER }] });
         continue;
@@ -404,6 +434,10 @@ export const chat = async (owner, message) => {
   if (cards.length === 0 && drawsCard(reply)) {
     console.error("Assistant reply drew a card or button without making one; replaced");
     reply = NO_CARD;
+    contents[contents.length - 1] = { ...contents.at(-1), parts: [{ text: reply }] };
+  } else if (reply.replace(TOOL_TAGS, "") !== reply) {
+    // A card was made, but the reply also spells out a tool call
+    reply = reply.replace(TOOL_TAGS, "").trim() || "Press Confirm on the card when you're ready.";
     contents[contents.length - 1] = { ...contents.at(-1), parts: [{ text: reply }] };
   }
 
