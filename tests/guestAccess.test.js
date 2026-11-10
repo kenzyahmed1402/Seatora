@@ -73,6 +73,23 @@ describe("guest accounts", () => {
     for (let i = 0; i < 10; i++) assert.equal((await api.post("/auth/guest").send(GUEST)).status, 201);
   });
 
+  it("a guest who is already logged in gets the details on the same account", async () => {
+    // A guest from before guests gave details: no name, email or phone
+    const { default: User } = await import("../models/User.js");
+    const old = await api.post("/auth/guest").send(GUEST);
+    const cookie = cookieHeader(cookiesFrom(old));
+    await User.updateOne({ _id: old.body.data.user._id }, { name: "Guest", $unset: { contactEmail: 1, phone: 1 } });
+
+    const res = await api.post("/auth/guest").set("Cookie", cookie).send({ ...GUEST, name: "Salma Adel" });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.user._id, old.body.data.user._id);
+    assert.equal(res.body.data.user.name, "Salma Adel");
+    assert.equal(res.body.data.user.phone, "+201001234567");
+
+    const account = await createUser();
+    assert.equal((await api.post("/auth/guest").set(account.auth).send(GUEST)).status, 409);
+  });
+
   it("put the guest's name, email and phone on their bookings", async () => {
     const admin = await createUser("ADMIN");
     const { showtime } = await createShowtime(admin);

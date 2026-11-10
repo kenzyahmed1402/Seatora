@@ -5,7 +5,7 @@ import AppError from '../utils/AppError.js';
 import catchAsync from '../utils/catchAsync.js';
 import { clearSession, clearVisitor, createSendToken, visitorId } from '../middlewares/auth.js';
 import { claimVisitorData } from '../services/visitorService.js';
-import { createGuest, upgradeGuest } from '../services/guestService.js';
+import { createGuest, setGuestDetails, upgradeGuest } from '../services/guestService.js';
 
 // Logs the user in: the visitor's chat and cards move to the account, then
 // the session cookie is set
@@ -58,7 +58,13 @@ export const login = catchAsync(async (req, res) => {
 // POST /auth/guest { name, email, phone }: continue without an account, with
 // the details the booking is for. Creates a guest account and logs it in;
 // see services/guestService.js.
+// A guest who is already logged in (e.g. made before guests gave their
+// details) gets the details on the same account, keeping its bookings.
 export const continueAsGuest = catchAsync(async (req, res) => {
+  if (req.user) {
+    createSendToken(await setGuestDetails(req.user, req.body), 200, res);
+    return;
+  }
   await logIn(req, res, await createGuest(req.body), 201);
 });
 

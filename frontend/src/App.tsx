@@ -10,10 +10,11 @@ import { BookingsPage } from "./pages/Bookings";
 import { PrivacyPage } from "./pages/Privacy";
 import { Logo } from "./components/Logo";
 
-const NAV: { page: Page; label: string; icon: LucideIcon }[] = [
+// `short`: the label on phones, where the three must fit on one line
+const NAV: { page: Page; label: string; short?: string; icon: LucideIcon }[] = [
   { page: "home", label: "What's on", icon: Film },
   { page: "chat", label: "Assistant", icon: Sparkles },
-  { page: "bookings", label: "My bookings", icon: Ticket },
+  { page: "bookings", label: "My bookings", short: "Bookings", icon: Ticket },
 ];
 
 export const App = () => {
@@ -33,6 +34,17 @@ export const App = () => {
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
+  }, []);
+
+  // The visible height, which shrinks when a phone's keyboard opens (100dvh
+  // doesn't), so the assistant's chat stays above the keyboard
+  useEffect(() => {
+    const view = window.visualViewport;
+    if (!view) return;
+    const measure = () => document.documentElement.style.setProperty("--view-h", `${view.height}px`);
+    measure();
+    view.addEventListener("resize", measure);
+    return () => view.removeEventListener("resize", measure);
   }, []);
 
   // My bookings needs an account: ask for one, or go back home
@@ -62,10 +74,17 @@ export const App = () => {
             Seatora
           </a>
           <nav aria-label="Main">
-            {NAV.map(({ page, label, icon: Icon }) => (
+            {NAV.map(({ page, label, short, icon: Icon }) => (
               <a key={page} href={href(page)} aria-current={route.page === page ? "page" : undefined}>
                 <Icon size={16} aria-hidden="true" />
-                {label}
+                {short ? (
+                  <>
+                    <span className="label-long">{label}</span>
+                    <span className="label-short">{short}</span>
+                  </>
+                ) : (
+                  label
+                )}
               </a>
             ))}
           </nav>
@@ -74,16 +93,22 @@ export const App = () => {
               <>
                 <span className="user-name">
                   <UserRound size={16} aria-hidden="true" />
-                  {user.isGuest ? "Guest" : user.name}
-                  {user.isGuest && <span className="badge">temporary</span>}
+                  {/* a guest who gave their details is shown by name */}
+                  {user.isGuest && !user.phone ? "Guest" : user.name}
+                  {user.isGuest && <span className="badge">guest</span>}
                 </span>
-                <button type="button" className="button ghost small" onClick={() => logout()}>
-                  <LogOut size={15} aria-hidden="true" /> Log out
+                <button type="button" className="button ghost small account-button" onClick={() => logout()} aria-label="Log out">
+                  <LogOut size={15} aria-hidden="true" /> <span className="account-label">Log out</span>
                 </button>
               </>
             ) : (
-              <button type="button" className="button ghost small" onClick={() => requireUser("Welcome to Seatora")}>
-                <LogIn size={15} aria-hidden="true" /> Log in
+              <button
+                type="button"
+                className="button ghost small account-button"
+                onClick={() => requireUser("Welcome to Seatora")}
+                aria-label="Log in"
+              >
+                <LogIn size={15} aria-hidden="true" /> <span className="account-label">Log in</span>
               </button>
             )}
           </div>

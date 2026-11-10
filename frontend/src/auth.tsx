@@ -81,7 +81,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const requireUser = useCallback(
     (reason = "Log in to continue", { booking = false }: { booking?: boolean } = {}) => {
-      if (user) return Promise.resolve(user);
+      // A guest from before guests gave their details is asked for them
+      // before booking; they're saved on the same guest account
+      const needsDetails = booking && user?.isGuest && !user.phone;
+      if (user && !needsDetails) return Promise.resolve(user);
       waiting.current?.(null);
       setDialogReason(reason);
       setDialogForBooking(booking);

@@ -20,6 +20,18 @@ export const createGuest = ({ name, email, phone }) =>
     guestExpiresAt: new Date(Date.now() + GUEST_DAYS * 24 * 60 * 60 * 1000),
   });
 
+// The name, email and phone of a guest who is already logged in. Only a
+// guest: an account already has its details.
+export const setGuestDetails = async (user, { name, email, phone }) => {
+  if (!user.isGuest) {
+    throw new AppError("You're already logged in with an account", 409);
+  }
+  const account = await User.findById(user._id);
+  account.set({ name, contactEmail: email, phone });
+  await account.save();
+  return account;
+};
+
 // Keeps a guest account that has started using the app, e.g. by booking
 export const keepGuest = async (user) => {
   if (user.isGuest && user.guestExpiresAt) {
