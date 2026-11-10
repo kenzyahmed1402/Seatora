@@ -233,9 +233,23 @@ NODE_ENV=development
 JWT_SECRET=<output of: openssl rand -hex 32>
 JWT_EXPIRES_IN=7d
 PAYPAL_ENV=sandbox
+PAYPAL_CLIENT_ID=<Sandbox REST app client ID>
+PAYPAL_CLIENT_SECRET=<Sandbox REST app secret>
+PAYPAL_WEBHOOK_ID=<Sandbox webhook ID, optional locally>
+GEMINI_API_KEY=<Google AI Studio API key>
+GROQ_API_KEY=<optional: Groq API key, used when Gemini can't answer>
 ADMIN_EMAIL=admin@cinema.com
 ADMIN_PASSWORD=<choose a password, at least 12 characters>
 ```
+
+**Getting the keys (all free):**
+
+1. **PayPal Sandbox:** sign in at [developer.paypal.com](https://developer.paypal.com), open *Apps & Credentials*, make sure **Sandbox** is selected, and create a REST app. Copy its client ID and secret. Under *Testing Tools → Sandbox Accounts* you'll find a sandbox **personal** account: log in with it on the PayPal button to pay.
+2. **PayPal webhooks (optional locally):** PayPal can only reach a public URL. On a hosted copy, add a Sandbox webhook to `https://<your-domain>/payments/webhook` for the `PAYMENT.CAPTURE.*` events and copy its ID. Payments work without it; the webhook only confirms them a second way.
+3. **Gemini:** create an API key in [Google AI Studio](https://aistudio.google.com). Without it everything works except the assistant.
+4. **Groq (optional):** create an API key at [console.groq.com](https://console.groq.com).
+
+Just want to try it? The live demo at <https://seatora-web.vercel.app> needs no setup: book as a guest and pay with a PayPal Sandbox personal account.
 
 ### Create the admin account (once per database)
 
