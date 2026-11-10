@@ -2544,6 +2544,22 @@ button.seat:disabled {
     font-size: 1.1rem;
   }
 
+  /* While typing to the assistant (the keyboard is open), the page links and
+     the chat's title step aside so the messages get the room; they come back
+     when the keyboard closes. App.tsx measures the header again by itself. */
+  .app:has(.composer :focus) nav,
+  .app:has(.composer :focus) .chat-head {
+    display: none;
+  }
+
+  .app:has(.composer :focus) .topbar-inner {
+    padding-bottom: 8px;
+  }
+
+  .app:has(.composer :focus) .chat-page {
+    padding-top: 6px;
+  }
+
   .chat-head .button {
     min-height: 34px;
   }
