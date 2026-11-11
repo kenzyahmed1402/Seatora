@@ -37,6 +37,9 @@ const handleValidationErrorDB = (err) => {
 
 const handleDuplicateFieldDB = (err) => {
   const fields = Object.keys(err.keyValue ?? {});
+  if (fields.length === 1 && fields[0] === 'email') {
+    return new AppError('An account with this email already exists. Please log in instead.', 409);
+  }
   const values = Object.values(err.keyValue ?? {}).map((value) =>
     value instanceof Date ? value.toISOString() : value
   );
@@ -75,6 +78,8 @@ const normalizeError = (err) => {
 
 const errorHandler = (err, req, res, next) => {
   const error = normalizeError(err);
+  // An error is never kept by a cache, even on a route that allows caching
+  res.setHeader('Cache-Control', 'no-store');
 
   // Stack traces and internal error details only in development. Any other
   // value, including a forgotten NODE_ENV, gets the safe production response.

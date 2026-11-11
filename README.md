@@ -1,17 +1,34 @@
-# Seatora - Cinema Booking Backend
+# Seatora
 
-A REST API for running a cinema booking system, built with **Node.js**, **Express 5** and **MongoDB (Mongoose)**.
+**Book cinema seats by chatting with an AI assistant, then pay with PayPal, without leaving the conversation.**
 
-It handles the full chain from venue setup to ticket sales: admins create **cinemas**, add **screens** with seat layouts, add **movies** and schedule **showtimes** (a movie on a screen at a given time); customers register, log in and take **bookings** for specific seats. The server enforces the rules: no double-booking, seats must exist on the screen, prices are calculated by the server, showtimes can't overlap, and customers only see and cancel their own bookings.
+Live demo: **<https://seatora-web.vercel.app>** · PayPal **Sandbox**: no real money moves · all movies and cinemas are fictional.
+
+![Seatora: book cinema seats by chatting, pay with PayPal right in the chat. A phone shows showtime chips in the assistant and a paid ticket with a QR code](docs/screenshots/banner.png)
+
+Seatora is a cinema-booking web app with an AI booking agent. A customer types something like *"a comedy this weekend at Downtown"*. The agent searches the real schedule straight away and the chat shows the matching showtimes as time chips. The customer taps one to pick seats in a 3D hall, or asks the agent to book, which shows a booking card with the seats and a server-calculated total. One click on **Confirm** holds the seats, the PayPal button appears on the card, and once the server has verified the payment the card turns into the ticket with a QR code. Cancelling works the same way: the agent shows the refund the policy allows, the customer confirms, and the refund goes back through PayPal.
+
+**Core rule:** the AI helps the customer decide; the backend owns seats, prices, booking states, payment verification and refunds; PayPal moves the money. Every action that holds seats, charges or refunds needs the customer's click.
+
+| Ask the assistant | Book on the card |
+| --- | --- |
+| ![The assistant's reply with time chips for two comedy showtimes](docs/screenshots/assistant-showtimes.png) | ![A booking card with seats C5 and C6 in a 3D hall and a Confirm button](docs/screenshots/assistant-card.png) |
+| **Pick seats yourself** | **Or tap a time** |
+| ![The 3D seat picker with the two best seats chosen](docs/screenshots/seat-picker.png) | ![A time chip asking how many seats before the seat picker](docs/screenshots/whats-on.png) |
 
 ---
 
 ## Table of Contents
 
+- [How it works](#how-it-works)
+- [The AI booking agent](#the-ai-booking-agent)
+- [PayPal integration](#paypal-integration)
+- [Architecture](#architecture)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
+- [Deploying (Vercel + MongoDB Atlas)](#deploying-vercel--mongodb-atlas)
 - [Environment Variables](#environment-variables)
 - [Authentication & Roles](#authentication--roles)
 - [Data Model](#data-model)
@@ -22,11 +39,64 @@ It handles the full chain from venue setup to ticket sales: admins create **cine
 - [Error Handling](#error-handling)
 - [Security](#security)
 - [Testing](#testing)
+- [Project history](#project-history)
+- [Credits](#credits)
 
 ---
 
+## How it works
+
+![The Seatora home page: "Your seat is waiting." beside a 3D cinema hall](docs/screenshots/home.png)
+
+1. **Ask.** "A comedy this weekend at Downtown for two." The agent searches the schedule (dates are worked out in cinema time) and the chat lists the results as time chips.
+2. **Choose.** Tap a chip, say how many seats, and the 3D seat picker opens with the best seats chosen; or ask the agent to book, and it checks the seats and shows a booking card.
+3. **Confirm.** One click holds the seats for 10 minutes. Visitors continue as a guest with their name, email and phone, or log in.
+4. **Pay.** The PayPal button appears on the card. The server creates the order from the booking (the browser and the AI never send an amount), captures it, and checks status, amount, currency and payee before confirming.
+5. **Ticket.** The card turns into the ticket: reference, seats, QR code, and a full ticket page to print or save.
+6. **Cancel.** Ask the agent or use My bookings: the refund the policy allows is shown first (100% up to 24 hours before, 50% up to 2 hours before), the customer confirms, and PayPal refunds it.
+
+## The AI booking agent
+
+The agent (`services/agentChat.js`) is a tool-calling loop: the model chooses tools, the server runs them for the logged-in customer, and the model answers from their results.
+
+- **Tools, from a fixed allowlist:** `searchMovies`, `searchShowtimes`, `getAvailableSeats`, `getBookingQuote`, `getMyBookings`, `getPaymentStatus`, `getCancellationQuote`, and two **propose** tools, `proposeBooking` and `proposeCancellation`, which only create a card. Nothing is held, charged or refunded until the customer clicks, and the server checks seats, price and refund again then.
+- **Models:** Google **Gemini** (`gemini-3.5-flash`, then `gemini-3.8-flash`) with function calling, and **Groq** (`openai/gpt-oss-120b`, then `openai/gpt-oss-20b`) as a fallback. Failures are classified (rate limit, overloaded, too slow, unknown model, refused key, request too large); a message moves to the next model, and models that are rate limited or overloaded are skipped for a while.
+- **Guards against model mistakes:** a reply that claims showtimes without searching triggers a required search; a tool call written out as text (`<proposeBooking …/>`) is turned into a required real call, and the markup is never shown; a reply that draws a fake card or button is replaced; IDs never reach the customer; showtime lists, cards and prices come only from tool results, never from the model's text.
+- **Limits:** 6 tool calls and 90 seconds per message, per-user and per-visitor message limits, and a daily cap on model calls.
+
+## PayPal integration
+
+PayPal is the payment layer of every booking (`services/paypalService.js`, `services/captureService.js`, `services/refundService.js`):
+
+- **Orders v2:** the server creates the order from the booking's total, in integer cents; the browser never sends an amount.
+- **JS SDK buttons** on the chat's booking card and on the booking page, loaded early so they appear right after Confirm.
+- **Verified capture:** the server captures and checks `COMPLETED`, amount, currency, payee and booking ownership before confirming. A payment that arrives after the hold ran out is refunded automatically and flagged for review.
+- **Refunds** through the Captures refund API, for exactly the amount the customer confirmed.
+- **Webhooks** (`PAYMENT.CAPTURE.COMPLETED`, `.DENIED`, `.REFUNDED`, `.REVERSED`), verified with PayPal's signature-verification API and idempotent, so duplicates and late deliveries change nothing twice.
+- **Sandbox only:** the server refuses to start unless `PAYPAL_ENV=sandbox`.
+
+## Architecture
+
+```
+Browser (React + TypeScript, served by Express)
+  ├─ Chat ─────────── POST /agent/chat ──────────► Agent: Gemini → Gemini → Groq → Groq
+  │                    (reply + cards + showtimes)    tool allowlist, guards, failover
+  │                    POST /agent/proposals/:id/confirm   (holds seats or cancels)
+  ├─ Time chips / seat picker ── POST /bookings     (hold seats for 10 minutes)
+  ├─ PayPal button on the card ─ POST /payments/orders → PayPal Sandbox (customer approves)
+  │                              POST /payments/capture  (server captures and verifies)
+  └─ My bookings ──── GET /bookings/:id/cancellation-quote, POST /bookings/:id/cancel (PayPal refund)
+PayPal ── webhooks ──► POST /payments/webhook (signature verified, idempotent)
+Everything ──────────► MongoDB Atlas
+```
+
 ## Features
 
+- **AI booking agent** with tool calling, showtime chips, booking and cancellation cards, and failover from Gemini to Groq
+- **PayPal checkout in the chat:** Orders v2, JS SDK buttons on the booking card, verified capture, refunds and verified webhooks (Sandbox)
+- **Web app:** a dark cinema design with a CSS 3D hall, a seat picker with "Best seats", time chips that ask how many seats, a ticket with a QR code, My bookings with cancellations and refunds, a Privacy page, and a phone layout that keeps the chat above the keyboard
+- **Guests:** book without an account by giving a name, email and phone; save it as an account later
+- **A demo schedule that renews itself** for the coming week
 - **Accounts and roles:** register/login with JWT, `CUSTOMER` and `ADMIN` roles, passwords hashed with bcrypt
 - **Admin management** of cinemas, screens, movies and showtimes
 - **Seat booking** with protection against double-booking (atomic `findOneAndUpdate` with `$nin` / `$addToSet`)
@@ -42,7 +112,8 @@ It handles the full chain from venue setup to ticket sales: admins create **cine
 - **Two validation layers** (request + Mongoose) and request bodies limited to allowed fields
 - **Consistent error responses** with the right status codes (400 / 401 / 403 / 404 / 409 / 429)
 - **Security:** helmet headers, CORS, a general rate limit plus a stricter one on login/register, at most 10 seats per customer per showtime
-- **Automated test suite** (137 tests) against an in-memory MongoDB
+- **Assistant tools:** a fixed allowlist of read tools and two "propose" tools that only create a card; the customer's click confirms it, after the server re-checks seats, price or refund
+- **Automated test suite** against an in-memory MongoDB
 
 ## Tech Stack
 
@@ -50,6 +121,10 @@ It handles the full chain from venue setup to ticket sales: admins create **cine
 | ---------- | ------------------------------------------------- |
 | Runtime    | Node.js (ES modules)                              |
 | Framework  | Express 5                                         |
+| Web app    | React 19, TypeScript, Vite, Lucide icons          |
+| AI         | Google Gemini (`@google/genai`, function calling), Groq (OpenAI-style API through `fetch`) |
+| Payments   | PayPal REST APIs (Orders v2, Captures, Refunds, Webhooks) and JS SDK, Sandbox |
+| Hosting    | Vercel, MongoDB Atlas                             |
 | Database   | MongoDB                                           |
 | ODM        | Mongoose 9                                        |
 | Auth       | jsonwebtoken, bcryptjs                            |
@@ -62,9 +137,10 @@ It handles the full chain from venue setup to ticket sales: admins create **cine
 
 ```
 .
+├── frontend/                 # The customer web app (React + TypeScript, Vite), built into public/
 ├── server.js                 # Entry point: loads .env, connects to MongoDB, starts listening
 ├── app.js                    # Express app: security middleware, routes, 404 + error handler (Vercel's entry)
-├── vercel.json               # Vercel install command
+├── vercel.json               # Vercel install and build commands
 ├── config/
 │   └── db.js                 # MongoDB connection (at startup, or on first request on Vercel); reports failed index builds
 ├── models/                   # Mongoose schemas
@@ -75,8 +151,19 @@ It handles the full chain from venue setup to ticket sales: admins create **cine
 │   ├── showTime.js
 │   ├── Booking.js
 │   ├── Payment.js            # PayPal order / capture record per booking
-│   └── WebhookEvent.js       # PayPal webhook events already handled
+│   ├── WebhookEvent.js       # PayPal webhook events already handled
+│   ├── RateLimit.js          # Rate-limit counts, shared by every instance
+│   ├── AgentProposal.js      # Booking / cancellation cards waiting for the customer's click
+│   └── AgentConversation.js  # Each customer's or visitor's assistant conversation
 ├── services/
+│   ├── bookingService.js     # Quote, hold, cancellation rules shared by the API and the assistant
+│   ├── showtimeService.js    # Showtime search shared by the API and the assistant
+│   ├── agentTools.js         # The assistant's allowlisted tools
+│   ├── agentChat.js          # One chat turn: model, tool calls, limits, history
+│   ├── geminiClient.js       # Gemini through Google's SDK (replaceable in tests)
+│   ├── proposalService.js    # Confirming a proposal card (re-checks everything)
+│   ├── guestService.js       # Guest accounts: create, keep, upgrade
+│   ├── visitorService.js     # Moving a visitor's chat and cards to their account at login
 │   ├── paypalService.js      # PayPal Sandbox client (token, create order, capture, refund)
 │   ├── captureService.js     # Checks and records a capture (endpoint and webhook)
 │   └── refundService.js      # The one refund routine used by every refund
@@ -98,7 +185,8 @@ It handles the full chain from venue setup to ticket sales: admins create **cine
 │   ├── showtimeSeats.js      # Atomic seat reserve / release on a showtime
 │   ├── bookingHolds.js       # Hold deadlines and expiry of unpaid bookings
 │   ├── cancellationPolicy.js # Refund percentage by time before the show
-│   └── listQuery.js          # Pagination, filters, list responses
+│   ├── listQuery.js          # Pagination, filters, list responses
+│   └── rateLimitStore.js     # Keeps rate-limit counts in MongoDB
 ├── scripts/
 │   ├── seedAdmin.js          # Creates the first admin account
 │   ├── seedDemo.js           # Adds the fictional demo catalogue
@@ -119,8 +207,8 @@ Each request passes through: **helmet → CORS → router → `protect` / `restr
 ### Installation
 
 ```bash
-git clone https://github.com/kenzyahmed1402/cinema-booking-backend.git
-cd cinema-booking-backend
+git clone https://github.com/kenzyahmed1402/Seatora.git
+cd Seatora
 npm install
 ```
 
@@ -145,9 +233,23 @@ NODE_ENV=development
 JWT_SECRET=<output of: openssl rand -hex 32>
 JWT_EXPIRES_IN=7d
 PAYPAL_ENV=sandbox
+PAYPAL_CLIENT_ID=<Sandbox REST app client ID>
+PAYPAL_CLIENT_SECRET=<Sandbox REST app secret>
+PAYPAL_WEBHOOK_ID=<Sandbox webhook ID, optional locally>
+GEMINI_API_KEY=<Google AI Studio API key>
+GROQ_API_KEY=<optional: Groq API key, used when Gemini can't answer>
 ADMIN_EMAIL=admin@cinema.com
 ADMIN_PASSWORD=<choose a password, at least 12 characters>
 ```
+
+**Getting the keys (all free):**
+
+1. **PayPal Sandbox:** sign in at [developer.paypal.com](https://developer.paypal.com), open *Apps & Credentials*, make sure **Sandbox** is selected, and create a REST app. Copy its client ID and secret. Under *Testing Tools → Sandbox Accounts* you'll find a sandbox **personal** account: log in with it on the PayPal button to pay.
+2. **PayPal webhooks (optional locally):** PayPal can only reach a public URL. On a hosted copy, add a Sandbox webhook to `https://<your-domain>/payments/webhook` for the `PAYMENT.CAPTURE.*` events and copy its ID. Payments work without it; the webhook only confirms them a second way.
+3. **Gemini:** create an API key in [Google AI Studio](https://aistudio.google.com). Without it everything works except the assistant.
+4. **Groq (optional):** create an API key at [console.groq.com](https://console.groq.com).
+
+Just want to try it? The live demo at <https://seatora-web.vercel.app> needs no setup: book as a guest and pay with a PayPal Sandbox personal account.
 
 ### Create the admin account (once per database)
 
@@ -164,6 +266,8 @@ npm run seed:demo -- --reset   # replaces the catalogue (refused in production o
 
 Adds a fictional catalogue: 3 cinemas with 2 screens each, 8 original movies, and showtimes for the next 7 days between 13:00 and 22:30 cinema time (`CINEMA_TZ`). Prices are $8–$16 per seat, with an evening surcharge from 17:00. Users and bookings are never changed.
 
+The schedule keeps itself filled: when showtimes are listed or the assistant searches them, the server plans the next 7 days again in the same way, at most once an hour (`services/showtimeSchedule.js`). A screen only gets showtimes on a day it has none, so nothing added by hand is overlapped or doubled. This uses only the demo cinemas and movies, found by name; any other catalogue is left alone. Set `SHOWTIME_AUTOFILL=off` to turn it off.
+
 ### Start the server
 
 ```bash
@@ -173,6 +277,20 @@ npm start            # plain start
 ```
 
 The server connects to MongoDB first, then logs `Server running on port 5050` (or your `PORT`).
+
+### Web app (React)
+
+The customer web app lives in `frontend/` (React + TypeScript, built with Vite). Pages use addresses after `#` (e.g. `/#/bookings`), so the server only serves one page and page addresses never clash with API paths.
+
+Anyone can browse what's on and talk to the assistant without an account. Booking, paying, cancelling and My bookings open a dialog to log in, create an account or continue as a guest. The home page opens on a 3D preview of a cinema hall, drawn with CSS 3D transforms (no 3D library), so it stays smooth on slow phones and stands still for visitors who turn motion off. The Assistant page (`/#/chat`) is the conversation with the Seatora assistant: the booking and cancellation cards it proposes appear as tickets, with a small 3D hall showing the proposed seats. Pressing Confirm asks a visitor to log in or continue as a guest first; nothing is held or cancelled before that. The assistant's replies are shown as text with simple formatting (paragraphs, lists, bold), never as raw HTML. Each showtime has its own page (`/#/showtime/<id>`) with a 3D seat picker: choose how many tickets, the best free seats together near the centre are suggested, and tapping a seat tilts the camera down over the hall to pick by hand. Holding the seats asks a visitor to log in or continue as a guest; the server checks the seats and works out the price. The home page filters showtimes by genre and cinema. Holding seats opens the booking page (`/#/booking/<id>`): the order with a countdown of the seat hold and PayPal's button (PayPal's script is loaded only on this page). The server creates the PayPal order from the booking, so the browser never sends an amount, and confirms the booking only after it has captured the payment and checked PayPal's answer. Once paid, the page turns into the ticket: a reference (e.g. `ST-18293A4B`) and a QR code linking to the booking page, which only its owner can open. The ticket can be printed or saved as a PDF (only the ticket prints) or saved as a PNG image drawn in the browser. A guest is offered to save the booking by turning the guest account into a normal one (`POST /auth/upgrade`). The QR code is made with `qrcode-generator` (MIT licence). My bookings (`/#/bookings`) lists the customer's bookings in two tabs: Upcoming (paid, unpaid and in-review bookings for shows still ahead, soonest first) and Past (everything else). A paid booking opens its ticket or is cancelled through a dialog that shows the refund under the policy before anything happens; an unpaid one is paid or its seats released. The movies are fictional, so their posters are line-art drawings made for this project (one symbol and colour per genre, in `frontend/src/components/genreArt.tsx`). The fonts (Playfair Display and Inter; SIL Open Font License) and the icons (Lucide; ISC licence) are bundled with the app, so no third-party service is called. Showtimes are shown in the cinemas' time zone, `Africa/Cairo` unless `VITE_CINEMA_TZ` is set at build time.
+
+```bash
+npm --prefix frontend ci       # once
+npm run dev                    # terminal 1: the API on http://localhost:5050
+npm --prefix frontend run dev  # terminal 2: the app on http://localhost:5173 (API calls are passed to :5050)
+```
+
+`npm run build` type-checks and builds the app into `public/` (not committed). Vercel runs it on every deploy; Express serves `public/` on every host, with helmet's security headers (a Content Security Policy that allows the site's own scripts plus PayPal's checkout script, frames and images, and nothing else from outside; and a cross-origin opener policy of `same-origin-allow-popups`, so PayPal's popup can report back to the page) and a one-year cache for the content-hashed files in `public/assets/`.
 
 ### Run the tests
 
@@ -184,9 +302,9 @@ npm test
 
 The app runs on Vercel as a single function (Vercel detects the Express app in `app.js`), with a MongoDB Atlas database. `server.js` doesn't run there: when `VERCEL` is set, `app.js` checks the settings as it loads and connects to the database on the first request. Seat holds still expire without the background sweeper, because every route that reads or books seats expires overdue holds first.
 
-1. **Atlas:** create a separate database for the deployed app (e.g. `cinemate-prod`) and a database user with *readWrite* on that database only and a long generated password. Under **Network Access**, allow `0.0.0.0/0`: Vercel has no fixed IP addresses, so the password protects the database.
+1. **Atlas:** create a separate database for the deployed app (e.g. `seatora-prod`) and a database user with *readWrite* on that database only and a long generated password. Under **Network Access**, allow `0.0.0.0/0`: Vercel has no fixed IP addresses, so the password protects the database.
 2. **Vercel:** **Add New → Project**, import this repository. Leave the framework, build and output settings as detected; `vercel.json` sets the install command (`npm ci --omit=dev`).
-3. **Environment variables** (in Vercel's settings only, never in the repository), for the Production environment: `MONGO_URI` (the deployed database), `JWT_SECRET` (a new one from `openssl rand -hex 32`), `NODE_ENV=production`, `TRUST_PROXY=1`, `PAYPAL_ENV=sandbox`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, and optionally `PAYPAL_MERCHANT_ID` and `CINEMA_TZ`.
+3. **Environment variables** (in Vercel's settings only, never in the repository), for the Production environment: `MONGO_URI` (the deployed database), `JWT_SECRET` (a new one from `openssl rand -hex 32`), `NODE_ENV=production`, `TRUST_PROXY=1`, `PAYPAL_ENV=sandbox`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `GEMINI_API_KEY`, and optionally `PAYPAL_MERCHANT_ID`, `CINEMA_TZ`, `GEMINI_MODEL`, `AI_DAILY_REQUEST_CAP` and `AI_USER_MESSAGE_LIMIT`.
 4. **Production branch:** Vercel serves the production URL from the branch set under **Settings → Environments → Production** (default `main`). Deployments of other branches are previews behind a Vercel login, which PayPal's webhooks can't reach.
 5. **Function region:** under **Settings → Functions**, pick the region closest to the Atlas cluster.
 6. Deploy, then check that `https://<your-project>.vercel.app/health` returns `{"status":"ok","database":"connected"}`. If the settings are incomplete, the function logs say which ones.
@@ -199,8 +317,6 @@ The app runs on Vercel as a single function (Vercel detects the Express app in `
 
    It adds the demo catalogue (only if the database has none) and the admin account, reading only `.env.production`. It refuses a connection string without a database name, or one pointing at the same database as your local `.env`.
 8. **PayPal webhook:** in the PayPal Developer Dashboard (Sandbox), add a webhook to your app for `https://<your-project>.vercel.app/payments/webhook` with the events *Payment capture completed*, *denied*, *refunded* and *reversed*. Put its ID in Vercel as `PAYPAL_WEBHOOK_ID` and redeploy.
-
-**Limitation:** the rate limits count requests in memory, so on Vercel each function instance keeps its own count, which restarts with the instance.
 
 ## Environment Variables
 
@@ -221,6 +337,17 @@ The app runs on Vercel as a single function (Vercel detects the Express app in `
 | `API_RATE_LIMIT`  | No          | `300`              | Requests allowed per IP per 15 minutes across the whole API.                |
 | `TRUST_PROXY`     | No          | `0`                | Number of proxies in front of the app when hosted (e.g. `1` on Vercel or Render). |
 | `CINEMA_TZ`       | No          | `Africa/Cairo`     | The cinemas' time zone (IANA name), used to plan demo showtimes in local time. |
+| `GEMINI_API_KEY`  | For the assistant | —            | Gemini API key (Google AI Studio). Without it `POST /agent/chat` answers `503`; everything else works. |
+| `GEMINI_MODEL`    | No          | `gemini-3.5-flash` | The Gemini model the assistant uses.                                         |
+| `GEMINI_FALLBACK_MODEL` | No    | `gemini-3.8-flash` | Used for a message when the first model fails (rate limit, overloaded, too slow) or is cooling down after a rate limit. |
+| `GROQ_API_KEY`    | No          | —                  | Groq API key (console.groq.com). When set, Groq's models answer when Gemini can't. |
+| `GROQ_MODELS`     | No          | `openai/gpt-oss-120b,openai/gpt-oss-20b` | The Groq models tried after Gemini's, in order.               |
+| `AI_DAILY_REQUEST_CAP` | No     | `200`              | Model calls allowed per day across all users, to protect the API quota.     |
+| `AI_USER_MESSAGE_LIMIT` | No    | `30`               | Messages to the assistant per user per hour.                                 |
+| `AI_VISITOR_MESSAGE_LIMIT` | No | `10`               | Messages to the assistant per hour from one network for visitors who haven't logged in. |
+| `GUEST_ACCOUNT_LIMIT` | No      | `10`               | Guest accounts that one network can create per hour.                         |
+| `SHOWTIME_AUTOFILL` | No        | on                 | `off` stops the demo schedule from planning the next 7 days by itself.       |
+| `SIGNUP_RATE_LIMIT` | No        | `10`               | New accounts (register, or a guest saving their account) that one network can create per hour. |
 | `ADMIN_NAME`      | No          | `Admin User`       | Used by `scripts/seedAdmin.js`.                                             |
 | `ADMIN_EMAIL`     | No          | `admin@cinema.com` | Used by `scripts/seedAdmin.js`.                                             |
 | `ADMIN_PASSWORD`  | For seeding | —                  | Used by `scripts/seedAdmin.js`; at least 12 characters, or the script refuses to run. |
@@ -237,6 +364,12 @@ Register or log in to get a token, then send it with every request that needs a 
 ```
 Authorization: Bearer <token>
 ```
+
+**Guests:** `POST /auth/guest { name, email, phone }` creates a temporary account for the person the booking is for and logs it in through the cookie. The name follows the sign-up rules, the email must be reachable, and the phone needs 7–15 digits, optionally after `+` (spaces, dashes, dots and brackets are removed). The email and phone are saved as contact details and copied onto each booking (`customerName`, `customerEmail`, `customerPhone`), and the ticket shows them. The email is never a login: the account itself gets a random email on the unreachable `.invalid` domain and a random password nobody sees, so it can't clash with an existing account. Only guests actually created count toward `GUEST_ACCOUNT_LIMIT`. The guest form links to a **Privacy** page (`#/privacy`, also in the footer) that says what's collected, why, who else is involved (PayPal gets only the booking's reference and amount; the AI services get only chat messages, never the guest's details), how long it's kept and which cookies are used. An unused guest account is deleted after 7 days; one that books is kept, and `POST /auth/upgrade` turns it into a normal account with the guest's own name, email and password, keeping its bookings.
+
+**Visitors** who haven't logged in can browse and chat with the assistant: their chat is kept under a random ID in a `seatora_visitor` cookie (HTTP-only, a day long) and moves to their account, with its cards, when they log in, register or continue as a guest. Confirming a card, booking, paying and cancelling always need a login.
+
+Browsers don't need the header: login and register also set a `seatora_session` cookie that is **HTTP-only** (page scripts can't read it), **Secure** (HTTPS only, except with `NODE_ENV=development` on localhost) and **SameSite=Strict** (other sites' pages can't send it, which also blocks cross-site request forgery). It expires with the token. `POST /auth/logout` deletes it. When both are sent, the Bearer header wins.
 
 | Situation                         | Response |
 | --------------------------------- | -------- |
@@ -264,6 +397,14 @@ All documents have `createdAt` / `updatedAt` timestamps.
 | `email`    | String | required, unique, valid email, max 254 chars, stored lowercase |
 | `password` | String | required, 8 chars to 72 bytes, hashed, never returned  |
 | `role`     | String | `CUSTOMER` (default) or `ADMIN`                        |
+
+Signing up (`POST /auth/register`, `POST /auth/upgrade`) adds these rules, in `utils/accountRules.js`:
+
+- **Name:** 2–50 characters after extra spaces are removed; letters of any one alphabet (with accents), with a space, hyphen, apostrophe or full stop between words; no digits or symbols. Names that pass for the cinema or its staff are refused, such as `Admin`, `Seatora Support` or `Guest`, including look-alike spellings (`A d-m í n`, Cyrillic `Аdmin`, fullwidth `ａｄｍｉｎ`).
+- **Email:** not a `.invalid` address (guest accounts use `@guest.invalid`).
+- **Password:** not a common password, not the email or name, and at least 4 different characters.
+
+Login only checks the shape of the email and password, so older accounts can still log in.
 
 ### Cinema
 
@@ -368,6 +509,9 @@ Access: **Public** = no login · **Logged in** = any user · **Admin** = admin o
 | ------ | ---------------- | --------- | ----------------------------------- |
 | `POST` | `/auth/register` | Public    | Create a customer account, returns a token |
 | `POST` | `/auth/login`    | Public    | Log in, returns a token             |
+| `POST` | `/auth/guest`    | Public    | Continue as a guest: creates a temporary account and logs it in (10 per network per hour) |
+| `POST` | `/auth/upgrade`  | Logged in (guest) | Turn the guest account into a normal one, keeping its bookings. Body: `name`, `email`, `password` |
+| `POST` | `/auth/logout`   | Public    | Delete the browser's login cookie   |
 | `GET`  | `/auth/me`       | Logged in | The current user                    |
 
 | Method | Path      | Access | Description                         |
@@ -378,13 +522,19 @@ Access: **Public** = no login · **Logged in** = any user · **Admin** = admin o
 | ------ | ------------------- | --------- | ------------------------------------------------------------- |
 | `GET`  | `/showTimes/:id/seats` | Public | Seat map: `rows`, `seatsPerRow`, `capacity`, `taken` seats, `available` count, `price` |
 | `POST` | `/bookings/quote`   | Logged in | Price of seats without reserving them. Body: `showtime`, `seats`. Same checks as booking; answers `totalPrice` and `totalCents` |
+| `GET`  | `/payments/config`  | Public    | The PayPal client ID and currency the web app needs to show PayPal's button. The client ID is public by design; the secret is never sent |
 | `POST` | `/payments/orders`  | Logged in | Start PayPal checkout for your own pending booking. Body: `booking` |
 | `POST` | `/payments/capture` | Logged in | Take the payment after you approved it in PayPal. Body: `orderId` |
 | `GET`  | `/payments/:id`     | Logged in | Your own payment (admins: any)                                |
 | `POST` | `/payments/:id/refund` | Admin  | Refund a `needs_review` payment in full                       |
 | `POST` | `/payments/webhook` | PayPal (signature checked) | PayPal's event notifications, see [Webhooks](#paypal-webhooks) |
 | `GET`  | `/bookings/:id/cancellation-quote` | Logged in | What cancelling your paid booking refunds right now |
-| `POST` | `/bookings/:id/cancel` | Logged in | Cancel your paid booking with a refund. Body: `{ "confirm": true }` |
+| `POST` | `/bookings/:id/cancel` | Logged in | Cancel your paid booking with a refund. Body: `{ "confirm": true, "expectedRefundCents"?: number }` |
+| `POST` | `/agent/chat` | Public | One message to the booking assistant (visitors too). Body: `message` (1–1000 characters). Answers `reply` and `cards` |
+| `GET`  | `/agent/chat` | Public | Your conversation as shown on screen |
+| `DELETE` | `/agent/chat` | Public | Start a new conversation |
+| `GET`  | `/agent/proposals/:id` | Public | One of your own proposal cards and its status |
+| `POST` | `/agent/proposals/:id/confirm` | Logged in | Confirm your own proposal card, see [Assistant tools](#assistant-tools-and-proposals) |
 
 See [Payments](#payments) for the rules.
 
@@ -430,7 +580,7 @@ The policy, in `utils/cancellationPolicy.js`, is the only place the refund rules
 | Less than 2 hours    | can't be cancelled     |
 
 - **`GET /bookings/:id/cancellation-quote`** shows what cancelling would refund right now, calculated by the server: `allowed`, `refundPercent`, `refundCents`, `paidCents`, `currency`, `showStartsAt`, `policy`.
-- **`POST /bookings/:id/cancel { "confirm": true }`** cancels your `confirmed` booking. Without `"confirm": true` it's refused (`400`). The refund is recalculated at that moment, not taken from an earlier quote. An unpaid booking is cancelled with `PUT /bookings/:id { "status": "cancelled" }` instead.
+- **`POST /bookings/:id/cancel { "confirm": true }`** cancels your `confirmed` booking. Without `"confirm": true` it's refused (`400`). The refund is recalculated at that moment, not taken from an earlier quote. With `expectedRefundCents` (the refund the customer was shown), a different refund is refused with `409` and nothing is cancelled, e.g. when the 24-hour mark passed in between; the web app always sends it. An unpaid booking is cancelled with `PUT /bookings/:id { "status": "cancelled" }` instead.
 
 How a refund runs (`services/refundService.js`, shared by every refund):
 
@@ -457,6 +607,50 @@ PayPal also reports payment events to `POST /payments/webhook`. They cover what 
 | `PAYMENT.CAPTURE.REFUNDED`   | A `refund_pending` payment becomes `refunded`. A refund made outside the app (e.g. in the PayPal dashboard) is recorded and its booking held as `needs_review` |
 | `PAYMENT.CAPTURE.REVERSED`   | Payment and booking become `needs_review` (e.g. a dispute)            |
 | Anything else                | Acknowledged and ignored                                              |
+
+### Assistant tools and proposals
+
+The booking assistant can only use the tools in `services/agentTools.js`. Each runs for the logged-in user (never a user named by the model), as a customer even for admins, and its arguments are checked like a request body, with unknown fields dropped.
+
+| Tool | Kind | What it does |
+| ---- | ---- | ------------ |
+| `searchMovies` | read | Movies by genre and/or title words |
+| `searchShowtimes` | read | Upcoming showtimes by area, cinema, movie, genre and days in cinema time (`date`, and `untilDate` for a range; the server turns them into the right time window), with cinema, local time, price and free seats |
+| `getAvailableSeats` | read | Seat layout and taken seats |
+| `getBookingQuote` | read | Server price for seats; reserves nothing |
+| `getMyBookings` | read | Your own bookings only |
+| `getPaymentStatus` | read | Payment status of your own booking |
+| `getCancellationQuote` | read | Refund the policy allows right now for your paid booking |
+| `proposeBooking` | propose | Saves a booking card (showtime, seats, server total); reserves nothing |
+| `proposeCancellation` | propose | Saves a cancellation card (booking, refund); cancels nothing |
+
+A card is saved as an `AgentProposal` and can be confirmed for 15 minutes with `POST /agent/proposals/:id/confirm`, which re-checks everything first:
+
+- **Booking card:** the seats must still be free and the price the same as on the card (otherwise `409` with the new price); then the seats are held as a `pending` booking, paid next with `POST /payments/orders`. In the web app the PayPal button appears on the card itself, with the hold's countdown, so the customer pays without leaving the chat; once the server has captured and verified the payment, the card turns into the ticket, with a link to the full ticket page (print, save image, save a guest's booking).
+- **Cancellation card:** the refund must still be the one on the card (otherwise `409` with the new amount, nothing refunded); then the booking is cancelled with that refund.
+- **Once only:** confirming again returns the first result, so a double click can't book or refund twice. A failed confirm changes nothing and can be retried; an expired card answers `410`; another user's card is `404`.
+
+### Assistant chat
+
+`POST /agent/chat { "message": "..." }` runs one turn with Gemini, or Groq when Gemini can't answer (`services/agentChat.js`):
+
+- **Server-side conversation:** the browser only sends the new message. The conversation, including tool calls and results, is stored per user, or per visitor cookie before login (`AgentConversation`, deleted 24 hours after the last message), so it can't be forged. Visitors can search and get booking cards; the tools about bookings and payments tell them to log in first.
+- **Tools only from the allowlist:** the model can ask for the tools above and nothing else; the server runs them for the logged-in user. Refusals (a taken seat, an unknown booking) go back to the model to explain.
+- **Cards from tool results:** `cards` in the answer come only from `proposeBooking` / `proposeCancellation` results, never from the model's text. A reply that draws its own card or button ("[Confirm Booking]", "click to pay", "the card below") when no card was made is replaced with a message saying the card couldn't be prepared.
+- **Showtimes in the chat:** `showtimes` in the answer are the results of all the message's `searchShowtimes` calls (one per day or genre all count, each showtime once, soonest first, at most 30). The chat shows them under the reply as time chips grouped by day and movie, and each chip opens that showtime's seat picker. They're left out when the message made a card. The model is told not to list them itself, but to write a sentence or two, such as how many there are and a question to narrow them down. Earlier searches' results are shortened to a count in the history the model gets, so it searches again, which shows the list with fresh seat counts, instead of listing from memory. This also keeps requests small. If a reply talks about showtimes it found ("Here are the showtimes this weekend", "I see two comedy showtimes", "There are no showtimes") but no search ran in that message, the model is asked once to search, and that call must use `searchShowtimes` (Gemini's function-calling mode `ANY`, Groq's `tool_choice`), since a reminder alone can be ignored. The reminder and the wrong reply aren't stored.
+- **Reply format:** short sentences and lists, never tables and never IDs; the server also removes any 24-character ID ("(ID: 6908…)") from replies. If a table still comes, the chat shows it as a list.
+- **Limits:** at most 6 tool calls per message, a 30-second timeout per model call and 90 seconds per message, `AI_USER_MESSAGE_LIMIT` messages per user per hour and `AI_VISITOR_MESSAGE_LIMIT` per network for visitors (`429`) and `AI_DAILY_REQUEST_CAP` model calls per day across all users.
+- **Answer length:** every model call sets a maximum answer length (4096 tokens on Gemini, 1024 on Groq).
+- **Models, in order** (`services/modelRouter.js`): `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, then the `GROQ_MODELS` (default `openai/gpt-oss-120b`, `openai/gpt-oss-20b`) when `GROQ_API_KEY` is set.
+- **Failover:** each failure is classified (`services/modelFailures.js`): rate limit, overloaded, too slow, unknown model, refused key, request too large, or other.
+  - A rate limit that asks to wait 5 seconds or less is waited out once on the same model.
+  - Otherwise the message starts again on the next model, even if it failed after some tool calls. The tools only read or propose, so running them again is safe, and cards from the failed attempt are dropped.
+  - A refused key, an account out of credit or a request too large for the provider's limits skips that provider's other models.
+- **Cooling down:** a rate-limited model is skipped for as long as the provider asked (Gemini's `retryDelay`, Groq's `retry-after`), an overloaded one for 15 seconds, and one the provider doesn't know (retired or misspelt, `404`) for 10 minutes, so the next messages go straight to the next model (`services/modelCooling.js`, kept in memory). If every model is cooling, the one free soonest is tried anyway.
+- **Groq** (`services/groqClient.js`): Groq's OpenAI-style chat API through `fetch`, with no extra package. The conversation stays stored in Gemini's shape and is converted both ways. Each stored model turn records which provider wrote it, and Gemini isn't sent the tool calls Groq made (Gemini 3 expects its own signed tool calls), only Groq's replies. Because Groq's free tier allows 8,000 tokens per minute per model, the oldest turns are left out to keep a request near 3,500 tokens, and gpt-oss models think at `low` effort.
+- **Small requests:** every model call resends the instructions (about 600 tokens, including the next 7 days in cinema time) and the tool definitions (about 850). The model gets a short form of search results (ID, movie, genre, cinema, local time, price, seats left), while the chat's list gets them in full. Earlier searches are shortened to a count.
+- **When everything fails:** if the models are busy, the answer is `503` with "The assistant is busy right now. Please try again in about N seconds, or book with the seat picker." If the models fail another way, aren't configured or the daily cap is reached, the `503` message points to the seat picker. Nothing from that turn is saved. Failures and switches are logged as `Assistant model call failed (<model>, <kind>): …` and `Assistant message moved to <model> …`.
+- **Instructions:** the model gets the current time in `CINEMA_TZ`, the cancellation policy, and the rules to ask instead of guessing, never to claim seats are booked or paid, and to treat text inside tool results as information, not instructions.
 
 ### Pagination, filters and sorting
 
@@ -659,9 +853,10 @@ Common status codes:
 | ----------------- | ------------------------------------------------------------------------------------------ | ----------------- |
 | helmet            | Standard security headers; hides `X-Powered-By`                                            | —                 |
 | CORS              | Lets browser frontends call the API; any origin unless restricted                          | `CORS_ORIGIN`     |
-| Rate limiting     | 300 requests per IP per 15 minutes across the API, and 10 failed login/register attempts per IP per 15 minutes (successes don't count); then `429` | `API_RATE_LIMIT`, `AUTH_RATE_LIMIT` |
+| Rate limiting     | 300 requests per IP per 15 minutes across the API, 10 failed login/register attempts per IP per 15 minutes (successes don't count), and 10 new accounts per IP per hour; then `429`. Counts are kept in MongoDB, shared by every running instance, with IPs stored only as hashes and deleted after the window | `API_RATE_LIMIT`, `AUTH_RATE_LIMIT`, `SIGNUP_RATE_LIMIT` |
+| App version       | Every response has `X-App-Version` (the deployed commit on Vercel, `dev` elsewhere). A page left open across a deploy sees a newer version and reloads once, at the next page change or after an assistant reply, never mid-checkout | — |
 | Proxy awareness   | Real client IPs for rate limiting when hosted behind a proxy                               | `TRUST_PROXY`     |
-| Password hashing  | bcrypt; passwords are never returned                                                       | —                 |
+| Password hashing  | bcrypt; passwords are never returned. A login for an unknown email takes as long as a wrong password, so it doesn't reveal which emails have accounts | —                 |
 
 ## Testing
 
@@ -669,7 +864,20 @@ Common status codes:
 npm test
 ```
 
-137 automated tests (Node's built-in test runner + `supertest`) cover bookings, seat rules, showtime overlaps, screen layouts, validation, errors, authentication and roles, delete rules, pagination and filters, and security. Each test file runs against its own in-memory MongoDB (`mongodb-memory-server`), so tests never touch your real database. The first run downloads a MongoDB binary, which is cached afterwards.
+269 automated tests in 34 files (Node's built-in test runner + `supertest`) cover bookings, seat rules, showtime overlaps, screen layouts, validation, errors, authentication, guests and roles, PayPal orders, captures, refunds and webhooks (against a fake PayPal), the assistant's tools, cards, failover and guards (against a fake model), rate limits and security. Each test file that needs a database runs against its own in-memory MongoDB (`mongodb-memory-server`), so tests never touch your real database. GitHub Actions runs the tests, a web app build and a secret scan (gitleaks) on every push.
+
+## Project history
+
+| Version | When | What |
+| --- | --- | --- |
+| [v1.0.0](https://github.com/kenzyahmed1402/Seatora/releases/tag/v1.0.0) | Aug 2026 | The cinema booking REST API: cinemas, screens, movies, showtimes and seat bookings with server-side rules |
+| v2.0.0 | Oct–Nov 2026 | Seatora: authentication and security hardening, PayPal payments, refunds and webhooks, the AI booking agent with failover, and the web app |
+
+Every change since v1.0.0: <https://github.com/kenzyahmed1402/Seatora/compare/v1.0.0...develop>. See [CHANGELOG.md](CHANGELOG.md) for details.
+
+## Credits
+
+All movies, cinemas, posters and the logo are fictional and made for this project. Fonts and libraries used under their open licences: [Playfair Display](https://fonts.google.com/specimen/Playfair+Display) and [Inter](https://rsms.me/inter/) (SIL Open Font License, via Fontsource), [Lucide](https://lucide.dev) icons (ISC), [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT). PayPal's buttons are PayPal's own.
 
 ## License
 

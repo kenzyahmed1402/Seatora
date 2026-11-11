@@ -1,0 +1,2699 @@
+/* Seatora: dark monochrome theme with an ivory accent, like a cinema with
+   the lights down. Every text colour is at least 4.5:1 on every background
+   it sits on. Only transform and opacity are animated, and nothing runs once
+   the page has settled. */
+
+:root {
+  --bg: #0a0a0a;
+  --card: #141414;
+  --raised: #1c1c1c;
+  --line: #262626;
+  --line-strong: #3a3a3a;
+  --text: #fafafa;
+  --body: #d6d6d6;
+  --muted: #8f8f8f;
+  --accent: #efe8da;
+  --accent-strong: #ffffff;
+  --on-accent: #0a0a0a;
+  --danger: #f1a7a0;
+  --glow: rgba(239, 232, 218, 0.06);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  --serif: "Playfair Display Variable", Georgia, "Times New Roman", serif;
+  --sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --radius: 16px;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--body);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--text);
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin: 0;
+}
+
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: var(--accent);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+svg {
+  flex: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.wrap {
+  width: min(1160px, 100% - 32px);
+  margin-inline: auto;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+  padding-bottom: 80px;
+}
+
+main:focus {
+  outline: none;
+}
+
+/* ---------- skip link ---------- */
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-160%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+/* ---------- header: solid, so scrolling stays smooth on weak devices ---------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  min-height: 68px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1.35rem;
+  text-decoration: none;
+}
+
+.brand .logo {
+  flex: none;
+}
+
+nav {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+nav a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: color 0.25s var(--ease);
+}
+
+nav a:hover,
+nav a[aria-current="page"] {
+  color: var(--text);
+}
+
+nav a::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transition: transform 0.5s var(--ease-out);
+}
+
+nav a[aria-current="page"]::after {
+  transform: scaleX(1);
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.user-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--body);
+  font-size: 0.95rem;
+}
+
+/* a nav label's phone version, shown only on phones */
+.label-short {
+  display: none;
+}
+
+.badge {
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* ---------- buttons ---------- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.25s var(--ease), border-color 0.25s var(--ease), color 0.25s var(--ease);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.button.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button.primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.button.secondary {
+  background: var(--raised);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.button.secondary:hover:not(:disabled),
+.button.ghost:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+.button.ghost {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.button.small {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 0.9rem;
+}
+
+.button.wide {
+  width: 100%;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease);
+}
+
+.icon-button:hover {
+  border-color: var(--muted);
+}
+
+/* ---------- cards and the soft mouse glow ---------- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.glow {
+  position: relative;
+}
+
+.glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(440px circle at var(--mx, 50%) var(--my, 50%), var(--glow), transparent 46%);
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .glow:hover::after {
+    opacity: 1;
+  }
+}
+
+/* ---------- hero ---------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  align-items: center;
+  gap: 48px;
+  padding: 64px 0 32px;
+}
+
+.hero-visual {
+  order: 2;
+  min-width: 0;
+}
+
+.hero-text {
+  min-width: 0;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.hero h1 {
+  font-size: clamp(2.75rem, 6vw, 4.5rem);
+  line-height: 1.05;
+}
+
+.hero h1 .w {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding: 0.06em 0 0.14em;
+  margin: -0.06em 0 -0.14em;
+}
+
+.hero h1 .w > span {
+  display: inline-block;
+}
+
+.points {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.points li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--body);
+}
+
+.points svg {
+  color: var(--accent);
+}
+
+.prompt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 32px;
+  padding: 6px 6px 6px 44px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  transition: border-color 0.25s var(--ease);
+}
+
+.prompt:focus-within {
+  border-color: var(--accent);
+}
+
+.prompt-icon {
+  position: absolute;
+  left: 18px;
+  color: var(--muted);
+}
+
+.prompt input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.prompt input::placeholder {
+  color: var(--muted);
+}
+
+.prompt input:focus-visible {
+  outline: none;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.chip {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--body);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease), color 0.25s var(--ease);
+}
+
+.chip:hover {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+/* ---------- the 3D hall ---------- */
+
+.hall-stage {
+  perspective: 1100px;
+  perspective-origin: 50% -20%;
+  padding-top: 64px;
+}
+
+.hall-camera {
+  position: relative;
+  transform-style: preserve-3d;
+  /* its own layer, so Safari doesn't repaint the scene while it moves */
+  will-change: transform;
+  /* narrower than the column: perspective widens the near rows */
+  margin-inline: 11%;
+  transform-origin: 50% 0%;
+  transform: rotateX(46deg);
+}
+
+/* the screen stands up at the far end of the floor */
+.hall-screen {
+  position: absolute;
+  left: 9%;
+  right: 9%;
+  bottom: 100%;
+  height: 46px;
+  transform-origin: 50% 100%;
+  /* lifted 2px off the floor's plane: where two 3D planes meet, Safari keeps
+     re-sorting them, and the screen flickers */
+  transform: translateZ(2px) rotateX(-52deg);
+  backface-visibility: hidden;
+  border-radius: 50% 50% 8px 8px / 16px 16px 8px 8px;
+  background: linear-gradient(180deg, rgba(239, 232, 218, 0.95), rgba(239, 232, 218, 0.35));
+}
+
+.hall-floor {
+  display: grid;
+  gap: 9px;
+  padding: 22px 16px 26px;
+  border: 1px solid var(--line);
+  border-radius: 20px 20px 32px 32px;
+  background:
+    radial-gradient(90% 55% at 50% 0%, rgba(239, 232, 218, 0.13), transparent 70%),
+    #101010;
+}
+
+.hall-screen-label {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.4em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.hall-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.hall-row-label {
+  width: 16px;
+  color: var(--muted);
+  font-size: 0.65rem;
+  text-align: center;
+}
+
+.seat {
+  display: inline-block;
+  flex: 1 1 0;
+  max-width: 30px;
+  aspect-ratio: 1 / 0.9;
+  border-radius: 6px 6px 8px 8px;
+  /* the darker band is the seat back, on the side facing the viewer */
+  background: #2e2e2e;
+  box-shadow: inset 0 -4px 0 #454545;
+}
+
+.seat.taken {
+  background: #1a1a1a;
+  box-shadow: inset 0 -4px 0 #232323;
+}
+
+.seat.picked {
+  background: var(--accent);
+  box-shadow: inset 0 -4px 0 #c9bfa9, 0 0 14px rgba(239, 232, 218, 0.45);
+}
+
+.seat.aisle {
+  margin-left: 14px;
+}
+
+.legend {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend .seat {
+  flex: none;
+  width: 16px;
+}
+
+/* ---------- the opening: pure CSS, from the first paint ---------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes wordUp {
+  from {
+    transform: translate3d(0, 108%, 0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* the camera glides in from further back and higher up, then settles */
+@keyframes glide {
+  from {
+    transform: translate3d(0, -4%, -420px) rotateX(64deg);
+  }
+  to {
+    transform: rotateX(46deg);
+  }
+}
+
+/* The fade is on the stage, never on the 3D camera: a see-through 3D scene
+   has to be flattened, and Safari flickers while it switches back */
+@keyframes hallFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* "backwards": once settled, the camera's own transform applies again,
+     so the seat picker can tilt it */
+  .hall-camera {
+    animation: glide 2.8s var(--ease-out) 0.1s backwards;
+  }
+
+  .hall-stage {
+    animation: hallFade 1s var(--ease-out) 0.1s backwards;
+  }
+
+  .hero .rise {
+    animation: rise 1s var(--ease-out) both;
+  }
+
+  .hero h1 .w > span {
+    animation: wordUp 1.2s var(--ease-out) both;
+  }
+
+  .hero h1 .w:nth-of-type(1) > span { animation-delay: 0.15s; }
+  .hero h1 .w:nth-of-type(2) > span { animation-delay: 0.25s; }
+  .hero h1 .w:nth-of-type(3) > span { animation-delay: 0.35s; }
+  .hero h1 .w:nth-of-type(4) > span { animation-delay: 0.45s; }
+
+  .hero .points { animation-delay: 0.55s; }
+  .hero .prompt { animation-delay: 0.65s; }
+  .hero .chips { animation-delay: 0.75s; }
+}
+
+/* ---------- sections ---------- */
+
+.home > section + section {
+  margin-top: 80px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.75rem;
+  margin-bottom: 24px;
+}
+
+.section-title svg {
+  color: var(--accent);
+}
+
+.loading {
+  color: var(--muted);
+  margin: 24px 0;
+}
+
+.error {
+  margin: 24px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--danger);
+  font-size: 0.95rem;
+}
+
+/* ---------- posters ---------- */
+
+.poster {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  border-radius: 12px;
+  color: #ffffff;
+  isolation: isolate;
+}
+
+/* a dark fade behind the title keeps white text readable on any colour */
+.poster::before {
+  content: "";
+  position: absolute;
+  inset: 40% 0 0;
+  z-index: -1;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+}
+
+.poster-art {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+}
+
+/* lines keep the same thickness on big and small posters */
+.poster-art * {
+  vector-effect: non-scaling-stroke;
+}
+
+.poster.large {
+  aspect-ratio: 2 / 3;
+  padding: 14px;
+}
+
+.poster.small {
+  width: 76px;
+  flex: none;
+  /* in a row, stay a thumbnail at the top instead of stretching to the
+     row's height (which phones did) */
+  align-self: flex-start;
+  padding: 0;
+}
+
+/* The 2:3 shape comes from this spacer (a padding is a share of the width)
+   rather than aspect-ratio, which some iOS Safari versions ignore for an
+   item in a row */
+.poster.small::after {
+  content: "";
+  display: block;
+  padding-top: 150%;
+}
+
+.poster.small .poster-title,
+.poster.small .poster-genre {
+  display: none;
+}
+
+.poster-genre {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.poster-title {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.poster-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(168px, 1fr);
+  gap: 18px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.movie-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.movie-tile .poster {
+  transition: transform 0.6s var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .movie-tile:hover .poster {
+    transform: translate3d(0, -6px, 0);
+  }
+}
+
+.movie-meta,
+.meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* ---------- showtimes ---------- */
+
+.tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+}
+
+.tab {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.25s var(--ease), background-color 0.25s var(--ease);
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.days {
+  margin-bottom: 24px;
+}
+
+.listing {
+  display: grid;
+  gap: 14px;
+}
+
+.listing-item {
+  display: flex;
+  gap: 22px;
+  padding: 18px;
+}
+
+.listing-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.listing-body h3 {
+  font-size: 1.3rem;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.description {
+  color: var(--body);
+  font-size: 0.95rem;
+}
+
+.times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.time-chip {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 2px;
+  min-width: 132px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--raised);
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-decoration: none;
+  transition: border-color 0.25s var(--ease);
+}
+
+/* the chip's summary is a button that opens the seat count */
+.time-chip-main {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.time-chip-main:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.time-chip.open {
+  border-color: var(--accent);
+}
+
+.time-chip-seats {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.time-chip-seats p {
+  margin: 0;
+}
+
+.time-chip-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.time-chip-count output {
+  min-width: 2ch;
+  color: var(--text);
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.time-chip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.time-chip strong {
+  color: var(--text);
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-chip:hover {
+  border-color: var(--accent);
+}
+
+/* ---------- showtimes in the chat ---------- */
+
+.chat-showtimes {
+  display: grid;
+  gap: 18px;
+  margin-top: 14px;
+}
+
+.chat-showtimes section {
+  display: grid;
+  gap: 14px;
+}
+
+.chat-showtimes-day {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chat-showtimes-title {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.chat-showtimes-title strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------- privacy ---------- */
+
+.privacy-sections {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+}
+
+.privacy-section {
+  padding: 20px 22px;
+}
+
+.privacy-section h2 {
+  margin-bottom: 10px;
+  font-size: 1.15rem;
+}
+
+.privacy-section ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--body);
+}
+
+/* ---------- how it works ---------- */
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.steps li {
+  display: grid;
+  gap: 6px;
+  padding: 24px;
+}
+
+.steps h3 {
+  font-size: 1.25rem;
+  margin-top: 10px;
+}
+
+.step-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--accent);
+}
+
+.step-number {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  color: var(--line-strong);
+  font-family: var(--serif);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+/* ---------- placeholder pages ---------- */
+
+.placeholder {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  margin-top: 64px;
+  padding: 40px;
+}
+
+/* ---------- log-in dialog ---------- */
+
+.auth-dialog {
+  width: min(420px, 100% - 32px);
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--body);
+  box-shadow: var(--shadow);
+}
+
+.auth-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.auth-dialog h2 {
+  font-size: 1.6rem;
+  margin: 0 44px 8px 0;
+}
+
+.auth-dialog > .muted {
+  margin-bottom: 22px;
+}
+
+.auth-dialog .close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+.auth-dialog .tabs {
+  display: flex;
+  margin-bottom: 16px;
+}
+
+.auth-dialog .tab {
+  flex: 1;
+}
+
+.hint {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.stack {
+  display: grid;
+  gap: 14px;
+}
+
+.stack label {
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.stack input {
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.stack input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  border-color: transparent;
+}
+
+/* ---------- assistant ---------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+.chat-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+  gap: 24px;
+  align-items: start;
+  padding-top: 24px;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--header-h, 69px) - 48px);
+  min-height: 440px;
+  overflow: hidden;
+  --notch: var(--card);
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chat-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.35rem;
+}
+
+.chat-head h1 svg,
+.panel-title svg {
+  color: var(--accent);
+}
+
+.chat-stream {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.chat-empty {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin: auto 0;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.chat-empty h2 {
+  font-size: 1.6rem;
+}
+
+.chat-hints {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 18px;
+  font-size: 0.9rem;
+}
+
+.chat-empty .chips {
+  justify-content: center;
+  margin-top: 8px;
+}
+
+@keyframes msgIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.msg {
+  display: flex;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.msg.new {
+  animation: msgIn 0.7s var(--ease-out) both;
+}
+
+.msg.user {
+  justify-content: flex-end;
+}
+
+.msg-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--accent);
+}
+
+.msg-content {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  max-width: min(640px, 100%);
+}
+
+.msg-text {
+  display: grid;
+  gap: 10px;
+  color: var(--body);
+}
+
+.msg-text ul,
+.msg-text ol {
+  display: grid;
+  gap: 4px;
+  padding-left: 20px;
+}
+
+.msg-text ul {
+  list-style: disc;
+}
+
+.msg-text ol {
+  list-style: decimal;
+}
+
+.msg-text strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.msg.user .msg-text {
+  padding: 10px 16px;
+  border-radius: 18px 18px 4px 18px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+@keyframes dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: none;
+  }
+  40% {
+    opacity: 1;
+    transform: translate3d(0, -3px, 0);
+  }
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+}
+
+.dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: dot 1.3s var(--ease) infinite;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.chat-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 20px 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 0 16px 16px;
+  padding: 8px 8px 8px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 24px;
+  background: var(--bg);
+  transition: border-color 0.25s var(--ease);
+}
+
+.composer:focus-within {
+  border-color: var(--accent);
+}
+
+.composer textarea {
+  flex: 1;
+  min-width: 0;
+  max-height: 160px;
+  padding: 9px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.5;
+  resize: none;
+  field-sizing: content;
+}
+
+.composer textarea::placeholder {
+  color: var(--muted);
+}
+
+.composer textarea:focus-visible {
+  outline: none;
+}
+
+.send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+  transition: background-color 0.25s var(--ease);
+}
+
+.send:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.send:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.chat-panel {
+  position: sticky;
+  top: calc(var(--header-h, 69px) + 24px);
+  display: grid;
+  gap: 14px;
+  --notch: var(--bg);
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.25rem;
+}
+
+.panel-empty {
+  display: grid;
+  justify-items: stretch;
+  text-align: center;
+  gap: 8px;
+  padding: 8px 16px 24px;
+}
+
+/* ---------- tickets: the assistant's cards ---------- */
+
+.ticket {
+  position: relative;
+  overflow: hidden; /* the stub's notches stay inside, so the page never gets wider than a phone */
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: var(--raised);
+}
+
+.ticket-main {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+}
+
+.ticket .poster.small {
+  width: 64px;
+}
+
+.ticket-body {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ticket-body h3 {
+  font-size: 1.25rem;
+}
+
+.ticket-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ticket-kind.cancel {
+  color: var(--danger);
+}
+
+.ticket-facts {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--body);
+  font-size: 0.9rem;
+}
+
+.ticket-facts li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* name on one line, email and phone under it; a long email address wraps
+   instead of widening the ticket */
+.ticket-facts .ticket-customer-row {
+  align-items: flex-start;
+}
+
+.ticket-customer-row svg {
+  margin-top: 3px;
+}
+
+.ticket-customer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ticket-customer span:empty {
+  display: none;
+}
+
+.ticket-facts svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.seat-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.seat-tag {
+  padding: 1px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-policy {
+  padding: 0 16px 14px;
+  font-size: 0.85rem;
+}
+
+/* perforated tear line with a notch cut on each side */
+.ticket-stub {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border-top: 2px dashed var(--line-strong);
+}
+
+.ticket-stub::before,
+.ticket-stub::after {
+  content: "";
+  position: absolute;
+  top: -12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--notch, var(--bg));
+}
+
+.ticket-stub::before {
+  left: -12px;
+}
+
+.ticket-stub::after {
+  right: -12px;
+}
+
+.ticket-amount {
+  display: grid;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.ticket-amount strong {
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1.2;
+}
+
+.ticket-action {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.ticket-note,
+.ticket-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.ticket-status {
+  font-size: 0.9rem;
+}
+
+.ticket-status.done {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ticket-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 16px;
+  color: var(--danger);
+  font-size: 0.875rem;
+}
+
+.ticket.compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 14px;
+  transition: border-color 0.25s var(--ease);
+}
+
+.ticket.compact .ticket-main {
+  min-width: 0;
+  padding: 12px;
+}
+
+.ticket.compact .poster.small {
+  width: 44px;
+}
+
+.ticket.compact h3 {
+  font-size: 1.05rem;
+}
+
+.ticket.compact.selected {
+  border-color: var(--accent);
+}
+
+.ticket-line {
+  font-size: 0.85rem;
+}
+
+.ticket-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease);
+}
+
+.ticket-open:hover {
+  border-color: var(--muted);
+}
+
+/* the small hall inside a ticket */
+.hall-stage.ticket-hall {
+  padding: 40px 0 8px;
+}
+
+/* A small hall inside a card doesn't play the camera glide: it's heavy in
+   a scrolling chat on a phone, and the hall is already in place */
+.hall-stage.ticket-hall,
+.hall-stage.ticket-hall .hall-camera {
+  animation: none;
+}
+
+/* Room for a card's hall while its seats load, so the card doesn't jump */
+.ticket-hall-space {
+  height: 230px;
+}
+
+.hall-stage.ticket-hall .hall-camera {
+  margin-inline: 13%;
+}
+
+.hall-stage.ticket-hall .hall-screen {
+  height: 26px;
+}
+
+.hall-stage.ticket-hall .hall-floor {
+  gap: 4px;
+  padding: 12px 8px 14px;
+  border-radius: 14px 14px 20px 20px;
+}
+
+.hall-stage.ticket-hall .hall-screen-label {
+  margin-bottom: 4px;
+  font-size: 0.55rem;
+}
+
+.hall-stage.ticket-hall .hall-row {
+  gap: 3px;
+}
+
+.hall-stage.ticket-hall .hall-row-label {
+  width: 10px;
+  font-size: 0.55rem;
+}
+
+.hall-stage.ticket-hall .seat {
+  max-width: 18px;
+  border-radius: 4px 4px 5px 5px;
+  box-shadow: inset 0 -3px 0 #454545;
+}
+
+.hall-stage.ticket-hall .seat.taken {
+  box-shadow: inset 0 -3px 0 #232323;
+}
+
+.hall-stage.ticket-hall .seat.picked {
+  box-shadow: inset 0 -3px 0 #c9bfa9, 0 0 10px rgba(239, 232, 218, 0.5);
+}
+
+.hall-stage.ticket-hall .seat.aisle {
+  margin-left: 8px;
+}
+
+/* ---------- seat picker ---------- */
+
+.showtime-page {
+  padding-top: 20px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: color 0.25s var(--ease);
+}
+
+.back-link:hover {
+  color: var(--text);
+}
+
+.picker-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: 24px;
+  align-items: start;
+}
+
+.picker-hall {
+  padding: 16px 16px 28px;
+  overflow: hidden;
+}
+
+.picker-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.picker-toolbar .legend {
+  margin-top: 0;
+}
+
+.picker-toolbar .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.hall-stage.picker {
+  padding-top: 84px;
+}
+
+/* the camera moves slowly between the hall view and the top view */
+.hall-stage.picker .hall-camera {
+  margin-inline: 8%;
+  transition: transform 1.6s var(--ease-out);
+}
+
+.hall-stage.picker.top .hall-camera {
+  transform: rotateX(10deg);
+}
+
+.hall-stage.picker .seat {
+  max-width: 36px;
+}
+
+button.seat {
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  transition: transform 0.5s var(--ease-out), background-color 0.3s var(--ease);
+}
+
+button.seat:disabled {
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  button.seat.free:hover {
+    background: #4a4a4a;
+  }
+}
+
+/* a picked seat rises a little and glows */
+.hall-stage.picker .seat.picked {
+  transform: translate3d(0, -3px, 0) scale(1.12);
+}
+
+.picker-summary {
+  position: sticky;
+  top: calc(var(--header-h, 69px) + 20px);
+  display: grid;
+  gap: 18px;
+  padding: 20px 20px 0;
+  --notch: var(--bg);
+}
+
+.picker-summary .ticket-stub {
+  margin: 0 -20px;
+  padding: 16px 20px;
+}
+
+.picker-summary .ticket-error {
+  margin: -6px 0 18px;
+}
+
+.summary-movie {
+  display: flex;
+  gap: 14px;
+}
+
+.summary-movie h1 {
+  font-size: 1.5rem;
+  margin-bottom: 6px;
+}
+
+.summary-movie .poster.small {
+  width: 64px;
+}
+
+.summary-count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-block: 1px solid var(--line);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stepper output {
+  min-width: 2ch;
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 1.4rem;
+  font-variant-numeric: lining-nums tabular-nums;
+  text-align: center;
+}
+
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.summary-seats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ---------- home filters ---------- */
+
+.filters {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.chip.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.no-results {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 0;
+}
+
+/* ---------- checkout and ticket ---------- */
+
+.booking-page {
+  display: grid;
+  gap: 18px;
+  width: min(620px, 100%);
+  margin: 0 auto;
+  padding-top: 20px;
+  --notch: var(--bg);
+}
+
+.booking-page .back-link {
+  margin-bottom: 0;
+}
+
+.ticket.checkout h1,
+.ticket.final h2 {
+  font-size: 1.6rem;
+}
+
+.ticket.full .poster.small {
+  width: 84px;
+}
+
+.hold-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--body);
+  font-size: 0.95rem;
+}
+
+.hold-clock strong {
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.hold-clock.urgent,
+.hold-clock.urgent strong {
+  color: var(--danger);
+}
+
+.checkout-pay {
+  display: grid;
+  gap: 12px;
+  padding: 4px 16px 20px;
+}
+
+.paypal-area {
+  display: grid;
+  gap: 10px;
+}
+
+/* PayPal draws its button in a frame; this keeps it a sensible width */
+.paypal-buttons {
+  width: min(420px, 100%);
+  margin: 0 auto;
+}
+
+.checkout-note {
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.checkout-ended {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.booking-done {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.final-stub {
+  justify-content: flex-start;
+  gap: 22px;
+}
+
+.qr {
+  display: block;
+  width: 148px;
+  height: 148px;
+  border-radius: 10px;
+}
+
+.ticket-ref {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.ticket-ref dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ticket-ref dd {
+  margin: 0 0 8px;
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.ticket-ref dd.ticket-status {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+}
+
+.ticket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.save-booking {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.save-head,
+.save-booking.done {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.save-booking svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.save-booking h3 {
+  font-size: 1.2rem;
+}
+
+/* the paid card turns over to show the ticket: transform only */
+@keyframes flipOut {
+  from {
+    transform: perspective(1400px) rotateY(0);
+  }
+  to {
+    transform: perspective(1400px) rotateY(90deg);
+  }
+}
+
+@keyframes flipIn {
+  from {
+    transform: perspective(1400px) rotateY(-90deg);
+  }
+  to {
+    transform: perspective(1400px) rotateY(0);
+  }
+}
+
+.ticket-flip.out {
+  animation: flipOut 0.55s cubic-bezier(0.55, 0, 1, 0.45) 0.35s forwards;
+}
+
+.ticket-flip.in {
+  animation: flipIn 0.75s var(--ease-out) both;
+}
+
+/* ---------- paying on the chat's booking card ---------- */
+
+.ticket-pay {
+  padding: 0 18px 18px;
+}
+
+.chat-ticket {
+  display: grid;
+  gap: 12px;
+}
+
+/* ---------- my bookings ---------- */
+
+.bookings-page {
+  display: grid;
+  gap: 18px;
+  width: min(820px, 100%);
+  margin: 0 auto;
+  padding-top: 28px;
+}
+
+.bookings-page .section-title {
+  margin-bottom: 0;
+}
+
+.bookings-page > .tabs {
+  justify-self: start;
+}
+
+.booking-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-right: 16px;
+}
+
+.booking-row .ticket-main {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+
+.booking-row h3 {
+  font-size: 1.25rem;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 0 16px 16px;
+}
+
+.status-badge {
+  justify-self: start;
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-badge.ok {
+  color: var(--accent);
+}
+
+.status-badge.warn {
+  color: #e6bf62;
+}
+
+.status-badge.muted {
+  color: var(--muted);
+}
+
+.hold-clock.small {
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.button.danger {
+  border-color: var(--danger);
+  background: transparent;
+  color: var(--danger);
+}
+
+.button.danger:hover:not(:disabled) {
+  background: rgba(241, 167, 160, 0.1);
+}
+
+.booking-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  color: var(--accent);
+  font-size: 0.95rem;
+}
+
+.bookings-empty {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 36px 20px;
+  text-align: center;
+}
+
+.bookings-empty h2 {
+  font-size: 1.4rem;
+}
+
+.confirm-dialog .refund-lines {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.refund-lines div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.refund-lines dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.refund-lines dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.refund-total dd {
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.confirm-dialog .hint {
+  text-align: left;
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* in the dialog: the main action on top, both full width */
+.confirm-dialog .dialog-actions {
+  flex-direction: column-reverse;
+  align-items: stretch;
+}
+
+.confirm-dialog .dialog-actions .ticket-status {
+  justify-content: center;
+}
+
+.bookings-empty .dialog-actions {
+  justify-content: center;
+  margin-top: 0;
+}
+
+/* ---------- footer ---------- */
+
+.footer {
+  border-top: 1px solid var(--line);
+  padding: 28px 0 36px;
+  font-size: 0.875rem;
+}
+
+/* ---------- tablets ---------- */
+
+@media (max-width: 960px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding-top: 32px;
+  }
+
+  .hero-visual {
+    order: 0;
+    width: min(560px, 100%);
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 1023px) {
+  .chat-page,
+  .picker-layout {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 16px;
+  }
+
+  .picker-summary {
+    position: static;
+  }
+}
+
+/* ---------- phones ---------- */
+
+@media (max-width: 720px) {
+  /* Two short rows: the brand and account icons, then the three pages on
+     one line, so the header leaves room for the page (and the keyboard) */
+  .topbar-inner {
+    gap: 2px 10px;
+    min-height: 0;
+    padding: 8px 0 0;
+  }
+
+  .brand {
+    gap: 8px;
+    font-size: 1.15rem;
+  }
+
+  .brand .logo {
+    width: 28px;
+    height: 28px;
+  }
+
+  nav {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: space-between;
+    margin: 0 -8px;
+  }
+
+  nav a {
+    gap: 6px;
+    padding: 10px 8px;
+    font-size: 0.88rem;
+    white-space: nowrap;
+  }
+
+  .label-long {
+    display: none;
+  }
+
+  .label-short {
+    display: inline;
+  }
+
+  .account {
+    gap: 8px;
+  }
+
+  .user-name {
+    max-width: 42vw;
+    overflow: hidden;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .user-name .badge {
+    display: none;
+  }
+
+  /* icon-only account buttons; the button keeps its label for screen readers */
+  .account-button {
+    min-height: 36px;
+    padding: 0 10px;
+  }
+
+  .account-label {
+    display: none;
+  }
+
+  .hall-stage {
+    padding-top: 44px;
+  }
+
+  .hall-camera {
+    margin-inline: 9%;
+  }
+
+  .hall-screen {
+    height: 32px;
+  }
+
+  .hall-floor {
+    gap: 6px;
+    padding: 16px 8px 20px;
+  }
+
+  .hall-row {
+    gap: 3px;
+  }
+
+  .hall-row-label {
+    width: 10px;
+  }
+
+  .seat.aisle {
+    margin-left: 8px;
+  }
+
+  .prompt {
+    flex-wrap: wrap;
+    border-radius: 22px;
+    padding: 6px;
+  }
+
+  .prompt-icon {
+    top: 19px;
+  }
+
+  .prompt input {
+    flex-basis: 100%;
+    padding-left: 38px;
+  }
+
+  .prompt .button {
+    width: 100%;
+  }
+
+  .home > section + section {
+    margin-top: 56px;
+  }
+
+  .section-title {
+    font-size: 1.45rem;
+  }
+
+  .listing-item {
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .poster.small {
+    width: 56px;
+  }
+
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .placeholder {
+    padding: 28px 20px;
+  }
+
+  .auth-dialog {
+    padding: 24px 20px;
+  }
+
+  /* The chat fills what's visible: --view-h follows the visible area, which
+     shrinks when the keyboard opens (set in App.tsx) */
+  .chat-page {
+    padding-top: 10px;
+  }
+
+  .chat {
+    height: calc(var(--view-h, 100dvh) - var(--header-h, 96px) - 20px);
+    min-height: 0;
+  }
+
+  .chat-head {
+    padding: 8px 12px;
+  }
+
+  .chat-head h1 {
+    font-size: 1.1rem;
+  }
+
+  /* While typing to the assistant (the keyboard is open), the page links and
+     the chat's title step aside so the messages get the room; they come back
+     when the keyboard closes. App.tsx measures the header again by itself. */
+  .app:has(.composer :focus) nav,
+  .app:has(.composer :focus) .chat-head {
+    display: none;
+  }
+
+  .app:has(.composer :focus) .topbar-inner {
+    padding-bottom: 8px;
+  }
+
+  .app:has(.composer :focus) .chat-page {
+    padding-top: 6px;
+  }
+
+  .chat-head .button {
+    min-height: 34px;
+  }
+
+  .chat-stream {
+    padding: 18px 12px;
+  }
+
+  .msg-avatar {
+    display: none;
+  }
+
+  .composer {
+    margin: 0 10px 10px;
+  }
+
+  .ticket-stub {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ticket-action {
+    justify-items: stretch;
+  }
+
+  .ticket-note {
+    justify-content: center;
+  }
+
+  .final-stub {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .row-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .qr {
+    width: 128px;
+    height: 128px;
+  }
+
+  .picker-hall {
+    padding: 12px 8px 20px;
+  }
+
+  .hall-stage.picker {
+    padding-top: 56px;
+  }
+
+  .hall-stage.picker .hall-camera {
+    margin-inline: 4%;
+  }
+
+  .hall-stage.picker .hall-row {
+    gap: 3px;
+  }
+
+  .hall-stage.picker .seat.aisle {
+    margin-left: 7px;
+  }
+
+  .hall-stage.picker .hall-row-label {
+    width: 9px;
+  }
+}
+
+/* ---------- reduced motion: nothing moves ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- print ---------- */
+
+@media print {
+  .topbar,
+  .skip-link,
+  .chips,
+  .prompt,
+  .hero-visual {
+    display: none;
+  }
+
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  /* On the booking page only the ticket prints */
+  body:has(.printable) * {
+    visibility: hidden;
+  }
+
+  body:has(.printable) .printable,
+  body:has(.printable) .printable * {
+    visibility: visible;
+  }
+
+  .printable {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-width: 16cm;
+    --notch: #ffffff;
+    background: #ffffff;
+    border-color: #999999;
+    color: #000000;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .printable h2,
+  .printable .ticket-facts,
+  .printable .ticket-ref dd,
+  .printable .ticket-status.done {
+    color: #000000;
+  }
+
+  .printable .ticket-kind,
+  .printable .seat-tag {
+    color: #000000;
+    border-color: #000000;
+  }
+
+  .printable .ticket-stub {
+    border-top-color: #999999;
+  }
+
+  .ticket-flip {
+    animation: none !important;
+  }
+}
+
+/* the smallest phones: the three pages still fit on one line */
+@media (max-width: 359px) {
+  nav a {
+    gap: 4px;
+    padding: 10px 5px;
+    font-size: 0.82rem;
+  }
+}

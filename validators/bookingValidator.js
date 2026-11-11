@@ -14,7 +14,7 @@ const seatsRule = {
 
 // Creating a booking: the user, customer name and email come from the
 // logged-in account, totalPrice is calculated and status starts as pending
-const bookingSchema = {
+export const bookingSchema = {
   showtime: { required: true, type: "ObjectId" },
   seats: seatsRule,
 };
@@ -36,8 +36,11 @@ const bookingCancelSchema = {
 };
 
 // Cancelling a paid booking needs an explicit yes, so it can't happen by accident
+// The refund the customer was shown can come along; a different refund is
+// then refused instead of made
 const paidCancelSchema = {
   confirm: { required: true, type: "boolean", enum: [true] },
+  expectedRefundCents: { type: "number", min: 0 },
 };
 
 export const validateBooking = validateRequest(bookingSchema);

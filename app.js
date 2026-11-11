@@ -1,4 +1,5 @@
 import express from "express";
+import { fileURLToPath } from "node:url";
 import mongoose from "mongoose";
 import cors from "cors";
 import helmet from "helmet";
@@ -9,6 +10,7 @@ import STRouter from "./routes/showTimeRouter.js";
 import bookingRouter from "./routes/bookingRouter.js";
 import authRouter from "./routes/authRouter.js";
 import paymentRouter from "./routes/paymentRouter.js";
+import agentRouter from "./routes/agentRouter.js";
 import { handlePayPalWebhook } from "./controllers/webhookController.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import { createApiLimiter } from "./middlewares/rateLimit.js";
@@ -23,8 +25,46 @@ const app = express();
 // rate limiting sees the real client IP. 0 when running directly.
 app.set("trust proxy", Number(process.env.TRUST_PROXY) || 0);
 
-// Standard security headers
-app.use(helmet());
+// Standard security headers, opened just enough for PayPal's checkout
+// button: its script, the frames and images it shows, the calls it makes,
+// and the popup window it opens (which has to report back to this page)
+const PAYPAL_SOURCES = ["https://*.paypal.com", "https://*.paypalobjects.com"];
+app.use(
+    helmet({
+        contentSecurityPolicy: {
+            directives: {
+                scriptSrc: ["'self'", ...PAYPAL_SOURCES],
+                frameSrc: ["'self'", ...PAYPAL_SOURCES],
+                connectSrc: ["'self'", ...PAYPAL_SOURCES],
+                imgSrc: ["'self'", "data:", ...PAYPAL_SOURCES],
+            },
+        },
+        crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    })
+);
+
+// Which deployment answered (Vercel sets the commit), so a page left open
+// across a deploy can tell it's out of date and reload (frontend/src/version.ts)
+const APP_VERSION = (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 12);
+app.use((req, res, next) => {
+    res.setHeader("X-App-Version", APP_VERSION);
+    next();
+});
+
+// The built web app (npm run build), with helmet's security headers. Served
+// here on every host, Vercel included: the fixed path below lets Vercel's
+// bundler include public/ with the app. Before the database connection and
+// the rate limits, so pages load without either. Built files have content
+// hashes in their names, so browsers may keep them for a year.
+app.use(
+    express.static(fileURLToPath(new URL("./public", import.meta.url)), {
+        setHeaders: (res, filePath) => {
+            if (filePath.includes("/assets/")) {
+                res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+            }
+        },
+    })
+);
 
 // On Vercel, server.js doesn't run: the settings are checked when the app
 // loads and the database is connected on the first request. Seat holds
@@ -72,6 +112,7 @@ app.use('/showTimes',STRouter);
 app.use('/bookings',bookingRouter);
 app.use('/auth',authRouter);
 app.use('/payments', paymentRouter);
+app.use('/agent', agentRouter);
 
 app.use((req, res, next) => {
     next(new AppError(`Can't find ${req.originalUrl} on this server`, 404));

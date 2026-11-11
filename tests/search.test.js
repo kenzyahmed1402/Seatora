@@ -15,8 +15,8 @@ const inHours = (hours) => new Date(Date.now() + hours * HOUR);
 // one that has already started to ones later today and tomorrow
 const catalogue = async () => {
   const [downtown, riverside] = await Cinema.create([
-    { name: "CineMate Downtown", location: "Downtown, 12 Central Avenue" },
-    { name: "CineMate Riverside", location: "Riverside, 48 Harbour Road" },
+    { name: "Seatora Downtown", location: "Downtown, 12 Central Avenue" },
+    { name: "Seatora Riverside", location: "Riverside, 48 Harbour Road" },
   ]);
   const [downScreen, riverScreen] = await Screen.create([
     { cinema: downtown._id, screenNumber: 1, rows: 5, seatsPerRow: 10, capacity: 50 },
@@ -45,9 +45,12 @@ describe("searching showtimes", () => {
     assert.equal(downtownSciFi.status, 200);
     assert.deepEqual(ids(downtownSciFi), [String(c.tonight._id)]);
     const [first] = downtownSciFi.body.data.showtimes;
-    assert.equal(first.screen.cinema.name, "CineMate Downtown");
+    assert.equal(first.screen.cinema.name, "Seatora Downtown");
     assert.equal(first.movie.title, "Orbit of Ashes");
     assert.equal(first.availableSeats, 50);
+
+    const one = await api.get(`/showTimes/${c.tonight._id}`);
+    assert.equal(one.body.data.showtime.screen.cinema.name, "Seatora Downtown");
 
     assert.equal(ids(await api.get(`/showTimes?cinema=${c.downtown._id}`)).length, 3);
     const window = await api.get(`/showTimes?from=${inHours(4).toISOString()}&to=${inHours(6).toISOString()}`);
@@ -108,5 +111,22 @@ describe("price quotes", () => {
     const booking = await api.post("/bookings").set(alice.auth).send(body);
     assert.equal(booking.status, 409);
     assert.match(booking.body.message, /already started/);
+  });
+});
+
+describe("caching the public lists", () => {
+  it("lets the CDN keep the movie and showtime lists briefly, never errors or seat maps", async () => {
+    const c = await catalogue();
+    for (const path of ["/showTimes?upcoming=true", "/movies"]) {
+      const res = await api.get(path);
+      assert.equal(res.status, 200, path);
+      assert.equal(res.headers["cache-control"], "public, max-age=0, s-maxage=30, stale-while-revalidate=300", path);
+    }
+    const refused = await api.get("/showTimes?genre=Opera");
+    assert.equal(refused.status, 400);
+    assert.equal(refused.headers["cache-control"], "no-store");
+    const seats = await api.get(`/showTimes/${c.tonight._id}/seats`);
+    assert.equal(seats.status, 200);
+    assert.equal(seats.headers["cache-control"], undefined);
   });
 });

@@ -24,3 +24,11 @@ describe("GET /health", () => {
     });
   });
 });
+
+describe("app version", () => {
+  it("every response says which deployment answered, so an old open page can reload", async () => {
+    const res = await api.get("/health");
+    assert.equal(res.headers["x-app-version"], "dev");
+    assert.equal((await api.get("/nothing-here")).headers["x-app-version"], "dev");
+  });
+});

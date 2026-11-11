@@ -1,0 +1,53 @@
+import { randomBytes, randomUUID } from "node:crypto";
+import User from "../models/User.js";
+import AppError from "../utils/AppError.js";
+
+// Days an unused guest account is kept
+export const GUEST_DAYS = 7;
+
+// A new guest account with the guest's name, contact email and phone (see
+// validateGuest). Its login email and password are random and never shown:
+// the guest is logged in only through the session cookie. The .invalid
+// domain can never receive mail.
+export const createGuest = ({ name, email, phone }) =>
+  User.create({
+    name,
+    contactEmail: email,
+    phone,
+    email: `guest-${randomUUID()}@guest.invalid`,
+    password: randomBytes(32).toString("hex"),
+    isGuest: true,
+    guestExpiresAt: new Date(Date.now() + GUEST_DAYS * 24 * 60 * 60 * 1000),
+  });
+
+// The name, email and phone of a guest who is already logged in. Only a
+// guest: an account already has its details.
+export const setGuestDetails = async (user, { name, email, phone }) => {
+  if (!user.isGuest) {
+    throw new AppError("You're already logged in with an account", 409);
+  }
+  const account = await User.findById(user._id);
+  account.set({ name, contactEmail: email, phone });
+  await account.save();
+  return account;
+};
+
+// Keeps a guest account that has started using the app, e.g. by booking
+export const keepGuest = async (user) => {
+  if (user.isGuest && user.guestExpiresAt) {
+    await User.updateOne({ _id: user._id }, { $unset: { guestExpiresAt: 1 } });
+  }
+};
+
+// Turns a guest account into a normal one with the guest's own name, email
+// and password, keeping its bookings
+export const upgradeGuest = async (user, { name, email, password }) => {
+  if (!user.isGuest) {
+    throw new AppError("This is already a full account", 409);
+  }
+  const account = await User.findById(user._id).select("+password");
+  account.set({ name, email, password, isGuest: false, guestExpiresAt: undefined });
+  await account.save();
+  account.password = undefined;
+  return account;
+};
