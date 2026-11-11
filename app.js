@@ -55,12 +55,20 @@ app.use((req, res, next) => {
 // here on every host, Vercel included: the fixed path below lets Vercel's
 // bundler include public/ with the app. Before the database connection and
 // the rate limits, so pages load without either. Built files have content
-// hashes in their names, so browsers may keep them for a year.
+// hashes in their names, so browsers may keep them for a year. The page
+// itself is always sent again in full: every build's index.html has the same
+// size and Vercel gives files a fixed date, so an ETag or Last-Modified would
+// never change and a browser would keep an old page that points to files the
+// new deploy doesn't have (a blank page).
 app.use(
     express.static(fileURLToPath(new URL("./public", import.meta.url)), {
+        etag: false,
+        lastModified: false,
         setHeaders: (res, filePath) => {
             if (filePath.includes("/assets/")) {
                 res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+            } else {
+                res.setHeader("Cache-Control", "no-cache");
             }
         },
     })
