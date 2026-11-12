@@ -22,7 +22,9 @@ const coolingUntil = new Map();
 // say anything about the next request.
 export const noteFailure = (model, kind, err, now = Date.now()) => {
   let ms;
-  if (kind === "limit") ms = retryAfterMs(err) ?? (isDailyLimit(err) ? DAILY_LIMIT_MS : LIMIT_DEFAULT_MS);
+  // A daily limit won't reset in the seconds the provider suggests: skip
+  // the model for an hour instead of failing on it every few messages
+  if (kind === "limit") ms = isDailyLimit(err) ? DAILY_LIMIT_MS : retryAfterMs(err) ?? LIMIT_DEFAULT_MS;
   else if (kind === "busy") ms = BUSY_MS;
   else if (kind === "missing") ms = MISSING_MS;
   else return;

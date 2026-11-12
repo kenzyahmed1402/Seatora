@@ -4,7 +4,7 @@ import { POLICY_TEXT } from "../utils/cancellationPolicy.js";
 import { DEFAULT_TIME_ZONE, localParts, zonedTime } from "../utils/timezone.js";
 import { MongoRateLimitStore } from "../utils/rateLimitStore.js";
 import { runTool, showtimeForModel, toolDeclarations } from "./agentTools.js";
-import { classifyFailure, isAccountWide, retryAfterMs } from "./modelFailures.js";
+import { classifyFailure, isAccountWide, isDailyLimit, retryAfterMs } from "./modelFailures.js";
 import { modelChain, shutsProvider } from "./modelRouter.js";
 import { modelsToTry, noteFailure, noteSuccess, secondsUntilFree } from "./modelCooling.js";
 
@@ -248,7 +248,7 @@ const askModel = async (entry, contents, loggedIn, started, requiredTool) => {
       modelFailed(entry.id, kind, err);
       const wait = retryAfterMs(err);
       const fits = Date.now() - started + (wait ?? 0) < TURN_BUDGET_MS - MODEL_TIMEOUT_MS;
-      if (kind === "limit" && attempt === 1 && wait !== undefined && wait <= SHORT_WAIT_MS && fits) {
+      if (kind === "limit" && attempt === 1 && wait !== undefined && wait <= SHORT_WAIT_MS && fits && !isDailyLimit(err)) {
         await sleep(wait);
         continue;
       }

@@ -67,6 +67,23 @@ describe("model cooling", () => {
     assert.deepEqual(modelsToTry(["a", "b"], now + 47000), ["a", "b"]);
   });
 
+  it("skips a model whose daily limit is used up for an hour, whatever retry delay it suggests", () => {
+    const daily = apiError(429, {
+      code: 429,
+      message:
+        "You exceeded your current quota. * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, " +
+        "limit: 20, description: Generate content requests per day limit exceeded on Free Tier. Please retry in 30.5s.",
+      status: "RESOURCE_EXHAUSTED",
+      details: [
+        { "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations: [{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }] },
+        { "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "30s" },
+      ],
+    });
+    noteFailure("gemini:a", classifyFailure(daily), daily, now);
+    assert.deepEqual(modelsToTry(["gemini:a", "groq:b"], now + 59 * 60 * 1000), ["groq:b"]);
+    assert.deepEqual(modelsToTry(["gemini:a", "groq:b"], now + 60 * 60 * 1000 + 1), ["gemini:a", "groq:b"]);
+  });
+
   it("skips a model the provider doesn't know for 10 minutes, then tries it again", () => {
     const notFound = apiError(404, { status: "NOT_FOUND", message: "models/gemini-none is not found" });
     noteFailure("gemini:gemini-none", classifyFailure(notFound), notFound, now);
